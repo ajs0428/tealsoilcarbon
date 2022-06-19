@@ -60,7 +60,7 @@ sampling <- function(points, file_str, img_path){
     #imglist_col <- list.files(img_path, pattern = "col_.*")
     imgs_paths <- paste0(img_path, imglist)  
     imgs <- terra::sds(terra::rast(img_paths))
-    for img in imgs[[1:12]]
+    #for img in imgs[[1:12]]
     print(imgs)
     
     #dat <- list()
