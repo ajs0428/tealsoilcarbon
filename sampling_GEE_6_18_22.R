@@ -11,16 +11,16 @@ setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/"
 path <- "SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/"
 
 #List of images per study area
-imglist <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/")
-imglist_hoh <- (list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
-                          pattern = "hoh_.*"))
-#hoh_str <- "hoh_.*"
-imglist_mas <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
-                          pattern = "mas_.*")
-imglist_col <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
-                          pattern = "col_.*")
-test <- rast(paste0("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/", imglist_mas[[1]]))
-plot(test)
+# imglist <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/")
+# imglist_hoh <- (list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
+#                           pattern = "hoh_.*"))
+# #hoh_str <- "hoh_.*"
+# imglist_mas <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
+#                           pattern = "mas_.*")
+# imglist_col <- list.files("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/",
+#                           pattern = "col_.*")
+# test <- rast(paste0("SOIL CARBON/SPATIAL LAYERS/GEE/all_spec_GEE/", imglist_mas[[1]]))
+# plot(test)
 
 # Read in points and make into the right vector for sampling
 table <- read.csv("SOIL CARBON/ANALYSIS/ALL_SOILC_PTS.csv") 
@@ -47,37 +47,34 @@ pts_col <- vect(subset(pts, STUDY == "COL"))
 #           pts extract func     raster func    path list vector subset     subset cols samplepts
 #               |                   |               |           |               |       |
 #               v                   v               v           v               v       v
-pts_test <- terra::extract((terra::rast(paste0(path, imglist_hoh[[2]])))[[c(9,21:23)]], pts_hoh) 
-colnames(pts_test)[2:5] <- c('B10', '1', '2', '3')
-g <- paste0('ST_B10', str_extract(imglist_hoh[1], '_m..'))
-
-test_list <- list.files(path, full.names = TRUE, pattern = "hoh.*")
-
-subset_me <- function(x){
-    terra::subset(x, c(9, 21:23))
-}
-
-temp <- lapply(test_list, rast) #%>%
-    #lapply(. %>% terra::subset(c(9, 21:23))) #%>% #works!
-    #lapply(. %>% extract(., pts_hoh)) #%>%
-    #lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
-   
-
-
-test <-  terra::rast(test_list)
-test_sprc <- terra::sprc(test)
-test[[c('SR_B2', 'NDVI')]] # returns the m00 of SR_B2 and NDVI
-terra::sources(test)[[1]][1] #gets the first source file path
-terra::sources(test)[[1]][grepl("hoh.*", terra::sources(test)[[1]])] # gets the list of sources with names
+# pts_test <- terra::extract((terra::rast(paste0(path, imglist_hoh[[2]])))[[c(9,21:23)]], pts_hoh) 
+# colnames(pts_test)[2:5] <- c('B10', '1', '2', '3')
+# g <- paste0('ST_B10', str_extract(imglist_hoh[1], '_m..'))
+# 
+# test_list <- list.files(path, full.names = T,pattern = "hoh.*")
+# 
+# subset_me <- function(x){
+#     terra::subset(x, c(9, 21:23))
+# }
+# 
+# temp <- lapply(test_list, rast) %>%
+#     lapply(. %>% terra::subset(c(9, 21:23))) %>% #works!
+#     lapply(. %>% extract(., pts_hoh)) #%>%
+#     #lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
+#    
+# 
+# 
+# test <-  terra::rast(test_list)
+# test_sprc <- terra::sprc(test)
+# test[[c('SR_B2', 'NDVI')]] # returns the m00 of SR_B2 and NDVI
+# terra::sources(test)[[1]][1] #gets the first source file path
+# terra::sources(test)[[1]][grepl("hoh.*", terra::sources(test)[[1]])] # gets the list of sources with names
 
 #function in progress
-#need to append data to sample point dataframe
+#hoh is longer than other areas 
 sampling <- function(points, img_path){
-    subset_me <- function(x){
-        terra::subset(x, c(9, 21:23))
-    }
     
-    imglist <- list.files(img_path, pattern = "*.tif")
+    imglist <- list.files(img_path, full.names = T, pattern = "*.tif")
     imglist_hoh <- str_subset(imglist, "hoh.*")
     imglist_mas <- str_subset(imglist, "mas_.*")
     imglist_col <- str_subset(imglist, "col_.*")
@@ -88,18 +85,19 @@ sampling <- function(points, img_path){
     pts_col <- vect(subset(pts, STUDY == "COL"))
     
     #make extracts
-    hoh_extracts <- terra::rast(paste0(img_path, imglist_hoh)) %>%
-        lapply(. %>% subset_me) %>%
-        lapply(. %>% extract(., pts_hoh)) %>%
-        lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
-    mas_extracts <- terra::rast(paste0(img_path, imglist_mas)) %>%
-        lapply(. %>% subset_me) %>%
-        lapply(. %>% extract(., pts_mas)) %>%
-        lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
-    col_extracts <- terra::rast(paste0(img_path, imglist_col)) %>%
-        lapply(. %>% subset_me) %>%
-        lapply(. %>% extract(., pts_col)) %>%
-        lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
+    hoh_extracts <-  lapply(imglist_hoh, rast) %>% #terra::rast(paste0(img_path, imglist_hoh)) %>%
+        lapply(. %>% terra::subset(c(9, 21:23))) %>%
+        lapply(. %>% extract(., pts_hoh)) #%>%
+        #lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
+    mas_extracts <- lapply(imglist_mas, rast) %>% #terra::rast(paste0(img_path, imglist_mas)) %>%
+        lapply(. %>% terra::subset(c(9, 21:23))) %>%
+        lapply(. %>% extract(., pts_mas)) #%>%
+        #lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
+    col_extracts <- lapply(imglist_col, rast) %>% #terra::rast(paste0(img_path, imglist_col)) %>%
+        lapply(. %>% terra::subset(c(9, 21:23))) %>%
+        lapply(. %>% extract(., pts_col))# %>%
+        #lapply(. %>% colnames(c('ID', 'ST_B10', 'NDVI', 'MNDWI', 'EVI ')))
+    
     
     return(list(hoh_extracts, mas_extracts, col_extracts))
     #pts_samp <- terra::extract(imgs_hoh, points)
@@ -122,10 +120,13 @@ sampling <- function(points, img_path){
     # return(dat)
 }
 
+all_area_pts_ext <- sampling(pts, path)
+hoh_pts_ext <- as.data.frame((test_samp[[1]][[6]]))
+mas_pts_ext <- as.data.frame(test_samp[[2]][[6]])
+col_pts_ext <- as.data.frame(test_samp[[3]][[6]])
+
+all_area_pts_ext[[]]
 
 
-test_samp <- sampling(pts, path)
-
-bind_rows(test_samp)
 
 
