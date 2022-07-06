@@ -121,12 +121,11 @@ sampling <- function(points, img_path){
 }
 
 all_area_pts_ext <- sampling(pts, path)
-hoh_pts_ext <- as.data.frame((test_samp[[1]][[6]]))
+hoh_pts_ext <- as.data.frame((test_samp[[1]][[6]])) 
 mas_pts_ext <- as.data.frame(test_samp[[2]][[6]])
 col_pts_ext <- as.data.frame(test_samp[[3]][[6]])
 
-all_area_pts_ext[[]]
-
-
-
+#write.csv(hoh_pts_ext, file = "SOIL CARBON/SPECTRAL/GEE_Hoh_spec.csv")
+#write.csv(mas_pts_ext, file = "SOIL CARBON/SPECTRAL/GEE_Mas_spec.csv")
+#write.csv(col_pts_ext, file = "SOIL CARBON/SPECTRAL/GEE_Col_spec.csv")
 
