@@ -1,0 +1,29 @@
+model{
+
+ for(i in 1:n){
+  y[i] ~ dnorm((beta.0 + u.0[u.idx[i]])*X[i,1] + (beta.1  + u.1[u.idx[i]])*X[i,2] + (beta.2  + u.2[u.idx[i]])*X[i,3], sigma.sq.p)
+ }
+
+ beta.0 ~ dnorm(0, 0.000001) 
+ beta.1 ~ dnorm(0, 0.000001)
+ beta.2 ~ dnorm(0, 0.000001)
+ 
+ for(i in 1:q){
+  u.0[i] ~ dnorm(0, sigma.sq.u0.p)
+  u.1[i] ~ dnorm(0, sigma.sq.u1.p)
+  u.2[i] ~ dnorm(0, sigma.sq.u2.p)
+ }  
+
+ sigma.sq.u0.p ~ dgamma(0.001, 0.001)
+ sigma.sq.u0 <- 1/sigma.sq.u0.p
+
+ sigma.sq.u1.p ~ dgamma(0.001, 0.001)
+ sigma.sq.u1 <- 1/sigma.sq.u1.p
+
+ sigma.sq.u2.p ~ dgamma(0.001, 0.001)
+ sigma.sq.u2 <- 1/sigma.sq.u2.p
+
+ sigma.sq.p ~ dgamma(0.001, 0.001)
+ sigma.sq <- 1/sigma.sq.p
+ 
+}

@@ -1,0 +1,303 @@
+rm(list=ls())
+###############
+## libraries ##
+library(raster)
+library(rjags)
+
+library(leaflet)
+library(leaflet.opacity)
+library(leaflet.esri)
+library(RColorBrewer)
+library(viridis)
+
+###################################################
+## A quick little mapping function using leaflet ##
+map.leaflet <- function(rast, col.pal = col.pal, BasemapLayer = esriBasemapLayers$Imagery){
+
+    title <- names(rast)
+    
+    if(class(rast) != "RasterLayer"){
+        rast <- raster(rast)
+    }
+    
+    pal <- colorNumeric(col.pal(100), values(rast), na.color = "transparent")
+    
+    leaflet() %>% addTiles() %>% addEsriBasemapLayer(BasemapLayer) %>%
+        addRasterImage(rast, colors = pal, layerId = "rast") %>%
+        addOpacitySlider(layerId = "rast") %>% addLegend(pal = pal, values = values(rast), title = title, opacity = .9)
+}
+
+## set up a color ramp for making plots
+col.pal <- colorRampPalette(brewer.pal(11, "Spectral")) ## if you like spectral
+## col.pal <- viridis ## if you like viridis
+
+##################
+## read in data ##
+load("lecture-4.RData")
+
+## Welcome to Penobscot Experimental Forest!
+## It is just outside of Orono in Maine
+## We have 604 available plot measurements of AGB
+## And we have percentile heights derived from airborne lidar data
+## The forest is split into many forest management units where different management strategies are implemented
+
+## here is a map of the management units with the locations of the inventory plots overlayed
+plot(mu.sp);points(pef.sp, pch = 19, cex = .5, col = "red")
+
+## here's a leaflet map of lidar 95th percentile height (think forest height)
+map.leaflet(pef.pred.sp[,"P95"], col.pal = col.pal)
+## Use the opacity slider under the legend to change the transparency of the P95 image.
+## There is a pretty big time difference between when the lidar was flown and the basemap image was taken, but
+## you can see how lidar height tracks with MUs. The next line puts the MU boundaries in the leaflet map.
+map.leaflet(pef.pred.sp[,"P95"], col.pal = col.pal) %>%
+    addPolygons(data = spTransform(mu.sp,CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")), fillColor = "Transparent")
+
+## build a model in JAGS relating squareroot transformed AGB to your favorite lidar percentile height variable.
+y <- sqrt(pef.sp$AGB)
+X <- cbind(1,pef.sp$P95) ## you can change X to change what variables you'd like to use or keep it P95 (95th percentile height).
+
+n <- length(y)
+
+## you can quick check how the model fits using lm
+summary(lm(y ~ X[,-1])) ## the -1 just takes the intercept column off the X design matrix (because lm automatically shoves one in there).
+
+## I wrote lm.jag in such a way that you don't have to edit it to add more covariates if you choose to do that later.
+## You just need to include an extra "p" variable in jags.data to tell JAGS how many covariates you have (includes intercept).
+jags.data <- list("y" = y, "X" = X, "p" = ncol(X), "n" = n)
+vars <- c("beta","sigma.sq")
+
+model <- jags.model("lm.jag", data = jags.data)
+
+samps <- coda.samples(model, vars, 5000)
+
+plot(samps) ## these should look fine. Hopefully they are nicely converged an oscillating quite quickly.
+
+## let's get us some residuals.
+## There are ways to get JAGS to put out posterior distributions for your fitted values, but I prefer doing it in R.
+## Here's how I do it.
+
+## I'm going to break out the beta and sigma.sq samples from samps
+beta.samps <- samps[[1]][,grep("beta",colnames(samps[[1]]))]
+sigma.sq.samps <- samps[[1]][,grep("sigma.sq",colnames(samps[[1]]))]
+
+## To sample from the posterior distribution for our y observations (think fitted values),
+## we need to draw 1 sample from each MCMC sample set.
+## That probably doesn't make sense so hopefully the example code below will help.
+
+## To draw our first sample of y from each plot we grab the first sample of b_0, b_1 and sigma.sq.
+beta.samp.1 <- matrix(beta.samps[1,], ncol = 1) ## We need this to be a column vector so our matrix algebra works.
+sigma.sq.samp.1 <- sigma.sq.samps[1]
+
+y.1 <- rnorm(n, X%*%beta.samp.1, sigma.sq.samp.1) ## y.1 is our first sample of y for each plot.
+## I'm using rnorm here because we used a normal likelihood for the model.
+
+## to get our second y sample, we move to the next set of samples for beta and sigma.sq
+beta.samp.2 <- matrix(beta.samps[2,], ncol = 1)
+sigma.sq.samp.2 <- sigma.sq.samps[2]
+
+y.2 <- rnorm(n, X%*%beta.samp.2, sigma.sq.samp.2)
+
+## to get the third, we move to the third set, and so on.
+
+## We can do this in a for loop though to get through all 5000 samples
+y.samps <- matrix(NA, nrow = n, ncol = nrow(beta.samps))
+for(i in 1:nrow(beta.samps)){
+    beta.samp.1 <- matrix(beta.samps[i,], ncol = 1)
+    sigma.sq.samp.1 <- sigma.sq.samps[i]
+    y.samps[,i] <- rnorm(n, X%*%beta.samp.1, sigma.sq.samp.1)
+}
+
+## Now row one of y.samps is 5000 samples from the posterior distribution of y for the first plot.
+## Row two is for the second plot and so on.
+
+hist(y.samps[1,]) ## And that's the posterior. This is how we get posterior distributions for predictions at new locations too.
+## Technically, these are called posterior predictive distributions (as opposed to posterior distributions).
+
+## To get y fitted values, just take the medians (or means if you want) of the y posterior predictive distributions.
+## You can do it in a for loop. I'm going to do it with an apply statement, because people tell me it's faster.
+y.fitted <- apply(y.samps, 1, median) ## It's certainly fewer lines of code.
+
+## now we can get at the residual
+res <- y - y.fitted
+
+hist(res) ## fairly normal. Is this enough to decide we have adhered to our linear modeling assumptions? I think not!
+
+## Our residuals need to be independent.
+
+## I'm going to add the residuals to pef.sp so we can map them
+pef.sp$res <- res
+
+spplot(pef.sp[,'res'], colorkey = T, col.regions = col.pal(100))
+
+## Or you can leaflet it up. Turn down opacity of lidar map to see the plots colored by residual value.
+## Note that the legend is for the lidar layer, not the residual values.
+map.leaflet(pef.pred.sp[,"P95"], col.pal = col.pal) %>%
+    addPolygons(data = spTransform(mu.sp,CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")), fillColor = "Transparent") %>%
+    addCircles(data = spTransform(pef.sp,CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")),
+           radius = 10, color = ~colorNumeric(col.pal(100),pef.sp$res)(pef.sp$res), fillOpacity = 1)
+
+## Looks like residuals are low in some MUs and high in other MUs, indicating that our residuals are not independent.
+## we can look at this another way
+plot(y.fitted,res, pch = 19, col = "grey");abline(h = 0, col = "red")
+
+## It looks okay. But when we highlight residuals from some MUs
+points(y.fitted[pef.sp$UNIT_ID == "U7B"],res[pef.sp$UNIT_ID == "U7B"], col = "red", pch = 19)
+points(y.fitted[pef.sp$UNIT_ID == "C16"],res[pef.sp$UNIT_ID == "C16"], col = "blue", pch = 19)
+points(y.fitted[pef.sp$UNIT_ID == "C32B"],res[pef.sp$UNIT_ID == "C32B"], col = "green", pch = 19)
+
+## If our residuals were independent, each of the MU residual subsets should have a mean around zero and a variance
+## very similar to the variance of all the residuals together.
+
+## This is clearly not the case.
+## There are a few ways we could adapt our model to try to address this problem.
+## We could bring the MU factor into the model as a dummy variable.
+
+## I'm going to show how to use a random effect to do it though.
+
+## First we will simplify our situation some by only considering the three MUs we highlighted in the residual plot above.
+## After that, I will challenge you to extend this to all MUs on your own.
+
+## The following just creates subset objects only containing the three MUs I'm considering.
+pef.sp.sub <- pef.sp[pef.sp$UNIT_ID %in% c("U7B","C16","C32B"),]
+pef.pred.sp.sub <- pef.pred.sp[pef.pred.sp$UNIT_ID %in% c("U7B","C16","C32B"),]
+
+y <- sqrt(pef.sp.sub$AGB)
+X <- cbind(1,pef.sp.sub$P95)
+
+n <- length(y)
+
+## We will try to fit this model:
+## y_ij = b0 + b1x1_ij + u_j + e_ij
+
+## where y_ij is sqrt(agb) for plot i with MU j.
+## we will have u_j ~ dnorm(0, sigma.sq.u)
+
+## I go into a little more detail about this model in the pdf.
+
+## we need to create a u index vector, so JAGS knows which u_j to use for each y.
+## check out hlm.jag to see where u.idx fits into the jags code.
+u.idx <- as.numeric(as.factor(pef.sp.sub$UNIT_ID))
+
+data.frame(u.idx,pef.sp.sub$UNIT_ID) ## so u_1 is for unit C16, u_2 is for C32B, u_3 is for U7B
+
+jags.data <- list("y" = y, "X" = X, "p" = ncol(X), "n" = n, "u.idx" = u.idx, "q" = length(unique(u.idx)))
+vars <- c("beta","sigma.sq", "u", "sigma.sq.u")
+
+model <- jags.model("hlm.jag", data = jags.data)
+
+samps <- coda.samples(model, vars, 5000)
+
+## We have a few more parameters to look at here so I'm to break them apart before plotting them
+beta.samps <- samps[[1]][,grep("beta",colnames(samps[[1]]))]
+sigma.sq.samps <- samps[[1]][,grep("sigma.sq",colnames(samps[[1]]))]
+u.samps <- samps[[1]][,grep("u\\[",colnames(samps[[1]]))]
+
+## becasue we have a more complex model, it'll be more likely that chains may not look so great.
+plot(beta.samps)
+plot(sigma.sq.samps)
+plot(u.samps)
+
+## yea mine look kind of ugly, but 5000 is a pretty low number of samples. I'm going to try 150000.
+## And I'm going to run the adapt phase a little longer
+model <- jags.model("hlm.jag", data = jags.data, n.adapt = 10000)
+samps <- coda.samples(model, vars, 150000)
+
+beta.samps <- samps[[1]][,grep("beta",colnames(samps[[1]]))]
+sigma.sq.samps <- samps[[1]][,grep("sigma.sq",colnames(samps[[1]]))]
+u.samps <- samps[[1]][,grep("u\\[",colnames(samps[[1]]))]
+
+## becasue we have a more complex model, it'll be more likely that chain may not look so great.
+plot(beta.samps)
+plot(sigma.sq.samps) ## sigma.sq.u looks goofy for me, but I think it's becasue it just tried a couple crazy huge values
+plot(u.samps)
+
+## now we can attempt to get our y fitted values
+y.samps <- matrix(NA, nrow = n, ncol = nrow(beta.samps))
+for(i in 1:nrow(beta.samps)){
+    beta.samp.1 <- matrix(beta.samps[i,], ncol = 1)
+    sigma.sq.samp.1 <- sigma.sq.samps[i,1] ## make sure we are grabbing sigma.sq and not sigma.sq.u
+    u.samp.1 <- u.samps[i,][u.idx] ## the second set of square brackets gets all the u's in the right places (using u.idx)
+    y.samps[,i] <- rnorm(n, X%*%beta.samp.1 + u.samp.1, sigma.sq.samp.1)
+}
+## we could have thinned these chains some so it didn't take so long to sample the ys, but... I didn't
+
+y.fitted <- apply(y.samps, 1, median)
+
+## now we can get at the residual
+res <- y - y.fitted
+
+hist(res) ## fairly normal again
+
+## I'm going to add the residuals to pef.sp.sub so we can map them
+pef.sp.sub$res <- res
+
+spplot(pef.sp.sub[,'res'], colorkey = T, col.regions = col.pal(100))
+
+## the residuals within MUs look well mixed. This is a good sign.
+
+## You can imagine this model as an MU-varying intercept model.
+## We effectively fit 3 trendlines; one for each MU.
+## Each MU has it's own intercept. They all share the same slope though.
+## Bonus points to anyone who can adapt this model to let the slopes vary by MU.
+
+## the model for MU[1] looks like this
+## y_i = b0 + b1x1_i + u[1] + e_i
+## The intercept for the MU[1] model is b0 + u[1]
+## Let's get the posterior distribution for the intercept for MU[1] (the C16 unit) (b0 + u[1])
+beta.0.u1.samps <- beta.samps[,1] + u.samps[,1]
+
+## and the other two MUs
+beta.0.u2.samps <- beta.samps[,1] + u.samps[,2]
+beta.0.u3.samps <- beta.samps[,1] + u.samps[,3]
+
+beta0.u1.md <- median(beta.0.u1.samps) ## posterior median for C16 intercept
+beta0.u2.md <- median(beta.0.u2.samps) ## posterior median for C32B intercept
+beta0.u3.md <- median(beta.0.u3.samps) ## posterior median for U7B intercept
+
+beta1.md <- median(beta.samps[,2])
+
+plot(X[,2],y, xlab = "Lidar height variable", ylab = "sqrt AGB", col = c("red","green","blue")[u.idx], pch = 19)
+abline(a = beta0.u1.md, b = beta1.md, col = "red", lwd = 2)   ## trendline for C16 unit
+abline(a = beta0.u2.md, b = beta1.md, col = "green", lwd = 2) ## trendline for C32B
+abline(a = beta0.u3.md, b = beta1.md, col = "blue", lwd = 2)  ## trendline for U7B
+
+## And here's how we'd do the prediction for these three MUs
+X.pred <- cbind(1,pef.pred.sp.sub$P95)
+n.pred <- nrow(X.pred)
+
+## now I'm going to thin out those chains. I'm only thinning here save my computer some cumputing time. 
+samps.idx <- seq(1,nrow(beta.samps), length.out = 1000) ## this will grab 1000 samples equally spread out across the chain
+
+beta.samps.thinned <- mcmc(beta.samps[samps.idx,])
+sigma.sq.samps.thinned <- mcmc(sigma.sq.samps[samps.idx,])
+u.samps.thinned <- mcmc(u.samps[samps.idx,])
+u.idx.pred <- as.numeric(as.factor(pef.pred.sp.sub$UNIT_ID)) ## hopefully 
+data.frame(u.idx.pred,pef.pred.sp.sub$UNIT_ID) ## I just scrolled through this to make sure
+## u_1 is for unit C16, u_2 is for C32B, u_3 is for U7B in this index. It is.
+## There are better ways to accomplish this check. I'm just lazy.
+
+y.pred.samps <- matrix(NA, nrow = n.pred, ncol = nrow(beta.samps.thinned))
+for(i in 1:nrow(beta.samps.thinned)){
+    beta.samp.1 <- matrix(beta.samps.thinned[i,], ncol = 1)
+    sigma.sq.samp.1 <- sigma.sq.samps.thinned[i,1] ## make sure we are grabbing sigma.sq and not sigma.sq.u
+    u.samp.1 <- u.samps.thinned[i,][u.idx.pred] ## the second set of square brackets gets all the u's in the right places (using u.idx)
+    y.pred.samps[,i] <- rnorm(n.pred, X.pred%*%beta.samp.1 + u.samp.1, sigma.sq.samp.1)
+}
+
+y.pred.md <- apply(y.pred.samps,1,median)
+
+## append these to pef.pred.sp.sub to make a map
+pef.pred.sp.sub$y.pred.md <- y.pred.md
+
+map.leaflet(pef.pred.sp.sub[,"y.pred.md"], col.pal = col.pal)
+## And there are predictions for squareroot of AGB for those three MUs. But nobody cares what the squareroot of AGB is.
+## we need AGB. We can do that by squaring the posterior distribution for y before taking the medians.
+## It's important to square the posterior distribution samples before taking the median. Don't just square the medians.
+
+y.pred.samps.sq <- y.pred.samps^2
+y.pred.md <- apply(y.pred.samps.sq,1,median)
+pef.pred.sp.sub$y.pred.md <- y.pred.md
+
+map.leaflet(pef.pred.sp.sub[,"y.pred.md"], col.pal = col.pal)
+
+## Alright. That's the process. See if you can make an AGB map for all the PEF MUs that have plots in them.

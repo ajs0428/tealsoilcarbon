@@ -1,0 +1,23 @@
+model{
+
+ for(i in 1:n){
+  y[i] ~ dnorm(mu[i] + u[u.idx[i]], sigma.sq.p)
+ }
+
+ mu <- X%*%beta
+
+ for(i in 1:p){
+  beta[i] ~ dnorm(0, 0.000001)
+ }
+
+ for(i in 1:q){
+  u[i] ~ dnorm(0, sigma.sq.u.p)
+ }    
+
+ sigma.sq.u.p ~ dgamma(0.001, 0.001)
+ sigma.sq.u <- 1/sigma.sq.u.p
+
+ sigma.sq.p ~ dgamma(0.001, 0.001)
+ sigma.sq <- 1/sigma.sq.p
+ 
+}

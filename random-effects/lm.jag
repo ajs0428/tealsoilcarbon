@@ -1,0 +1,15 @@
+model{
+
+ for(i in 1:n){
+  y[i] ~ dnorm(mu[i], sigma.sq.p)
+ }
+
+ mu <- X%*%beta
+
+ for(i in 1:p){
+  beta[i] ~ dnorm(0, .000001)
+ }
+ 
+ sigma.sq.p ~ dgamma(0.001, 0.001)
+ sigma.sq <- 1/sigma.sq.p
+}

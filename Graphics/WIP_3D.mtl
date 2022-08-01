@@ -1,0 +1,6 @@
+newmtl ray_surface 
+map_Kd WIP_3D.png 
+
+newmtl ray_base
+Kd 0.2000 0.2000 0.2000
+
