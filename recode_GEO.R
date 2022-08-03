@@ -48,7 +48,7 @@ plot(hoh_geo_crop_agg_rast)
 #get shapefile
 #col_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_poly.shp")
 mas_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_poly/mashel_poly.shp")
-
+mas_points <- vect("ANALYSIS/MAS_SOILC_7_11_22_samp.csv", geom = )
 #reproject
 col_poly_proj <- terra::project(col_poly, "EPSG:26910")
 mas_poly_proj <- terra::project(mas_poly, "EPSG:26910")

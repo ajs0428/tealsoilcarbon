@@ -13,6 +13,7 @@ library(merTools)
 library(randomForest)
 library(mgcv)
 library(gstat)
+library(mapview)
 
 
 setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/SOIL CARBON/')
@@ -99,8 +100,8 @@ WIP_lm <- lm(log(CARBON) ~ WIP, data = all);summary(WIP_lm)
 #The regular GEO layer is actually way better than the binary class. 
 #But for the individual study areas the binary may be better
 
-lmer_mod <- lmer((CARBON) ~  WIP + log10(PRECIP)+  MNDWI_sum + (1|GEO), data = all, REML = F);summary(lmer_mod)
-lmer_mod_log <- lmer(sqrt(CARBON) ~ WIP + log10(PRECIP)  + MNDWI_sum + (1|GEO), data = all, REML = F);summary(lmer_mod_log)
+lmer_mod <- lmer((CARBON) ~  WIP + log10(PRECIP)  + MNDWI_sum + (1|GEO) , data = all, REML = F);summary(lmer_mod)
+lmer_mod_log <- lmer(sqrt(CARBON) ~ WIP + log10(PRECIP) +  MNDWI_sum + (1|GEO), data = all, REML = F);summary(lmer_mod_log)
 
 
 #check some assumptions
@@ -116,7 +117,7 @@ r.sq(all$CARBON, fitted(lmer_mod))
 
 #evaluate the log model
 anova(lmer_mod_log) #check on factors, none significant, not sure how to interpret
-r.sq(sqrt(all$CARBON), fitted(lmer_mod_log)) #0.4477694 
+r.sq(sqrt(all$CARBON), fitted(lmer_mod_log)) 
 
 #check the predictions of the model vs the actual 
 plot(predict(lmer_mod_log), all$CARBON, col = as.factor(all$GEO),  pch = 19)
@@ -179,7 +180,7 @@ hoh_mod <- lmer((CARBON) ~   WIP + MNDWI_sum + (1|GEO), data = hoh, REML = F);su
 hoh_mod_log <- lmer(sqrt(CARBON) ~   WIP +   MNDWI_sum + (1|GEO), data = hoh, REML = F);summary(hoh_mod_log)
 ####### Hoh evaluate the log model
 anova(hoh_mod) #check on factors, none significant, not sure how to interpret
-r.sq((hoh$CARBON), fitted(hoh_mod))  
+r.sq((hoh$CARBON), fitted(lmer_mod)[31:66])  
 
 anova(hoh_mod_log) #check on factors, none significant, not sure how to interpret
 r.sq(sqrt(hoh$CARBON), fitted(hoh_mod_log)) 
@@ -229,8 +230,8 @@ corrplot::corrplot(mat, method = "number", number.cex= 0.5)
 lasso(mas)
 
 #### Mashel linear mixed model with binary GEO as random effect
-mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + (1|GEO), data = mas, REML = F);summary(mas_mod)
-mas_mod_log <- lmer(sqrt(CARBON) ~  WIP + TWI + MNDWI_sum + (1|GEO), data = mas, REML = F);summary(mas_mod_log)
+mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + SLP + EVI_sum +  (1|GEO), data = mas, REML = F);summary(mas_mod)
+mas_mod_log <- lmer(sqrt(CARBON) ~   WIP + MNDWI_sum + SLP + (1|GEO), data = mas, REML = F);summary(mas_mod_log)
 #### Mashel check some assumptions
 hist(resid(mas_mod))
 plot(predict(mas_mod), resid(mas_mod))
@@ -279,7 +280,7 @@ corrplot::corrplot(mat, method = "number", number.cex= 0.5)
 lasso(col) #weird
 
 #### Colville linear mixed model with binary GEO as random effect
-col_mod <- lmer((CARBON) ~  WIP  +  log10(PRECIP) +(1|GEO), data = col, REML = F);summary(col_mod)
+col_mod <- lmer((CARBON) ~  WIP  +  log10(PRECIP) + (1|GEO), data = col, REML = F);summary(col_mod)
 col_mod_log <- lmer(sqrt(CARBON) ~   WIP  + PRECIP   +(1|GEO), data = col, REML = F);summary(col_mod_log)
 #### Colville check some assumptions
 hist(resid(col_mod))
@@ -362,9 +363,9 @@ lmer_func <- function(data){
 #B2 <- raster('A:/WA_tealcarbon/HOH_CARBON/SPATIAL_LAYERS/hoh')
 #EVI <- raster("")
 
-#PRECIP <-rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_precip_rsmpl.tif")
+PRECIP <-rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_precip_rsmpl.tif")
 #DTW <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/MainChannelDTW.tif')
-#SLP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_slp_rsmpl.tif")
+SLP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_slp_rsmpl.tif")
 #SCA <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_sca_rsmpl.tif")
 #WIP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_fill.tif")
 WIP2 <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_2022_fullmodel_v08/Hoh_2022_fullmodel_v08.tif.tif")
@@ -381,7 +382,7 @@ MNDWI_SUM_R <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_MNDWI_SUM_R.t
 #Check extents
 #TWI is weird, might have to address in ArcGIS 
 #For now just match extent with nearest neighbor resampling 
-ext(WIP) == ext(GEO)
+ext(WIP) == ext(SLP)
 ext(WIP) == ext(MNDWI_SUM_R)
 
 terra::plot(WIP, main = "1-WIP2")
@@ -394,14 +395,14 @@ terra::plot(WIP, main = "1-WIP2")
 
 #stack rasters from model see below
             #lmer_mod <- lmer((CARBON) ~  WIP +  log10(PRECIP) + NDVI_spr + MNDWI_sum + (1|GEO)
-rs <- c(WIP, MNDWI_SUM_R, GEO)
+rs <- c(WIP, PRECIP,  MNDWI_SUM_R, GEO)
 
 
 #So slope is a factor that fucks up most of our prediction##########################
 
 
 #Change names to match the dataframe extraction I think...
-names(rs) <- c("WIP", "MNDWI_sum", "GEO")
+names(rs) <- c("WIP", "PRECIP",  "MNDWI_sum", "GEO")
 #names(rs) <- c("SCA", "WIP", "TWI",  "GEO")
 
 #looking at coefficients for fixed and random effects
@@ -412,8 +413,8 @@ rands <- ranef(hoh_mod) #random
 # the old way of using just the coefs doesn't work because I don't know 
 # how to apply a random effect
 #Pred <- (DTW*betas[2]) + (TWI_rspl*betas[3] + (WIP*betas[4]) + betas[4])
-Pred <- terra::predict(rs, hoh_mod, allow.new.levels = TRUE, filename = "HOH_CARBON_7_31_22.tif", overwrite = TRUE)
-plot(Pred)
+Pred <- terra::predict(rs, lmer_mod, allow.new.levels = TRUE, filename = "HOH_CARBON_7_31_22_ASM.tif", overwrite = TRUE)
+plot(Pred<0)
 
 # predfun <- function(model, data) {
 #     v <- predict(model, data, se.fit=TRUE)
@@ -443,23 +444,25 @@ plot(Pred)
 #raster layers of variables
 #DTW + SLP + log(SCA) + WIP + NDVI + TWI + (1|GEO)
 #DTW <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_DTW.tif')
-#SLP <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_TWI_SLP.tif')
+SLP <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_TWI_SLP.tif')
 #SCA <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_TWI_SCA.tif')
 WIP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_WIP_clip.tif")
 #MNDWI_SUM <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mas_spec_5yr_sea2.tif')[["MNDWI"]]
 #MNDWI_SUM_R <- resample(MNDWI_SUM, WIP, method = "bilinear", filename = 'SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_MNDWI_SUM.tif', overwrite = T)
 MNDWI_SUM <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_MNDWI_SUM.tif')#[["MNDWI"]]
 #TWI <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_TWI.tif')
+PRECIP <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_precip_resamp7_31.tif')
+#PRECIP <- resample(PRECIP, WIP, method = "bilinear", filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mashel_precip_resamp7_31.tif", overwrite = T)
 GEO <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_R_GEO_CROP_AGG.tif')
-plot(MNDWI_SUM)
+plot(PRECIP)
 
-ext(WIP) == ext(GEO)
+ext(WIP) == ext(PRECIP)
 ext(WIP) == ext(MNDWI_SUM)
 #B2 <- raster('A:/WA_tealcarbon/HOH_CARBON/SPATIAL_LAYERS/hoh')
-#EVI <- raster("")
+#EVI <- rast('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/mas_spec_5yr_sea2.tif')[["EVI"]]
 #NDWI
 #NAIPg <- raster('A:/WIP_sample_points/NAIP Imagery/Hoh/Hoh_NAIP_clip.tif', band = 2)
-#PRECIP <- raster('A:/WA_tealcarbon/HOH_CARBON/SPATIAL_LAYERS/hoh_precip_proj_clip.tif')
+
 #GEO <- raster( "A:/WA_tealcarbon/MASHEL_CARBON/Mashel_spatial_layes/mashel_DTW_binaryreclass.tif")
 
 #GEO_OG_rspl <- raster::resample(geo_res, WIP, method='ngb')
@@ -470,14 +473,14 @@ ext(WIP) == ext(MNDWI_SUM)
 
 #stack rasters from model see below
 #           sqrt(DTW) + sqrt(SCA) + WIP +  TWI + (1|GEO),
-rs <- c(WIP, MNDWI_SUM, GEO)
+rs <- c(WIP, PRECIP,  MNDWI_SUM, GEO)
 
 #Change names to match the dataframe extraction I think...
 #names(rs) <- c("TWI", "DTW", "MHCLASS_FACT", "WIPv8")
-names(rs) <- c("WIP",  "MNDWI_sum", "GEO")
+names(rs) <- c("WIP", "PRECIP",  "MNDWI_sum", "GEO")
 
-Pred = terra::predict(rs, mas_mod, allow.new.levels = TRUE, filename = "MAS_CARBON_7_31_22.tif", overwrite = TRUE)
-plot(Pred)
+Pred = terra::predict(rs, lmer_mod, allow.new.levels = TRUE, filename = "MAS_CARBON_7_31_22_ASM.tif", overwrite = TRUE)
+plot(Pred>0)
 
 #write it out and save 
 #writeRaster(Pred, 'SPATIAL LAYERS/PREDICT_SOIL_CARBON/MAS_CARBON_7_11_22.tif',  overwrite = T)
@@ -490,13 +493,13 @@ plot(Pred)
 #raster layers of variables
 #DTW  + WIP + NDVI + Precip  + (1|GEO)
 #DTW <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/col_DTW_rspl.tif")
-#SLP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/col_SLP_rspl.tif")
+SLP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/col_SLP_rspl.tif")
 #SCA <- raster('A:/WA_tealcarbon/MASHEL_CARBON/Mashel_spatial_layes/mashel_TWI_SCA.tif')
 WIP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/colville_NWI_WIP_clip.tif")
 #MNDWI_SUM <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/col_spec_5yr_sea2.tif")[["MNDWI"]]
 #MNDWI_SUM_R <- resample(MNDWI_SUM, WIP, method = "bilinear")
 #terra::writeRaster(MNDWI_SUM_R, "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_MNDWI_SUM.tif", overwrite = TRUE)
-#MNDWI_SUM <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_MNDWI_SUM.tif")
+MNDWI_SUM <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_MNDWI_SUM.tif")
 #TWI <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/col_TWI_rspl.tif")
 #B2 <- raster('A:/WA_tealcarbon/HOH_CARBON/SPATIAL_LAYERS/hoh')
 #EVI <- raster("")
@@ -527,18 +530,17 @@ plot(GEO)
 
 #stack rasters from model see below
 #           SLP + WIP  + TWI + (1|GEO_bin)
-rs <- c( WIP, (PRECIP), GEO)
+rs <- c(WIP, PRECIP, MNDWI_SUM, GEO)
 
 #Change names to match the dataframe extraction I think...
 #names(rs) <- c("TWI", "DTW", "MHCLASS_FACT", "WIPv8")
-names(rs) <- c( 'WIP', "PRECIP", "GEO")
+names(rs) <- c("WIP", "PRECIP",   "MNDWI_sum", "GEO")
 
-Pred = terra::predict(rs, col_mod, allow.new.levels = TRUE, filename = "COL_CARBON_7_31_22.tif", overwrite =T)
+Pred = terra::predict(rs, lmer_mod, allow.new.levels = TRUE, filename = "COL_CARBON_7_31_22_ASM.tif", overwrite =T)
 #plot(Pred, col=rev( rainbow( 99, start=0,end=1 ) ),zlim=c(-50,0)  )
-plot(Pred)
+plot(Pred<0)
 
-#write it out and save 
-writeRaster(Pred,  'SPATIAL LAYERS/PREDICT_SOIL_CARBON/COL_CARBON_7_11_22.tif', overwrite = T)
+
 
 
 
