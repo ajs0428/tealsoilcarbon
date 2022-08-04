@@ -48,18 +48,21 @@ plot(hoh_geo_crop_agg_rast)
 #get shapefile
 #col_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_poly.shp")
 mas_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_poly/mashel_poly.shp")
-mas_points <- vect("ANALYSIS/MAS_SOILC_7_11_22_samp.csv", geom = )
+mas<- read.csv("ANALYSIS/MAS_SOILC_7_11_22_samp.csv")
+mas_points <- vect(mas, geom = c("lon", "lat"))
+set.crs(mas_points, "EPSG:4326")
 #reproject
 col_poly_proj <- terra::project(col_poly, "EPSG:26910")
 mas_poly_proj <- terra::project(mas_poly, "EPSG:26910")
+mas_points_proj <- terra::project(mas_points, "EPSG:26910")
 
 #crop wa geo then read in written file
 col_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/COL_R_GEO_CROP.gpkg")#crop(wa_geo_proj, col_poly_proj)
 mas_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/MAS_R_GEO_CROP.gpkg")#crop(wa_geo_proj, mas_poly_proj)
 #writeVector(mas_geo_crop,  "SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/MAS_R_GEO_CROP.gpkg")
 plot(col_geo_crop, "GEOLOGIC_A")
-plot(mas_geo_crop, "GEOLOGIC_A")
-
+plot(mas_geo_crop, "GEOLOGIC_U")
+plot(mas_points_proj, add = T)
 #all of the geologic ages in all study areas
 h <- hoh_geo_crop$GEOLOGIC_A #"Miocene-Eocene"      "Holocene-Quaternary" "Pleistocene"  
 c <- col_geo_crop$GEOLOGIC_A #"Eocene"  "pre-Tertiary" "Quaternary"   "Pleistocene"  "Present"   

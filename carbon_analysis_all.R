@@ -14,6 +14,7 @@ library(randomForest)
 library(mgcv)
 library(gstat)
 library(mapview)
+library(kit)
 
 
 setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/SOIL CARBON/')
@@ -28,25 +29,27 @@ wd = '/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/SO
 #all <- read.csv("ANALYSIS/ALL_SOILC_PTS_EE_BIN.csv")
 all <- read.csv("ANALYSIS/ALL_SOILC_7_31_22.csv")
 
-head(all)
-(names(all))
+# head(all)
+ (names(all))
 # names(all) <- c("STUDY_AREA", "OID_", "FID_","lon","lat","AGE_LITHOL", "AGE_LITH_C", "B2","B3","B4",
 #                 "B8","CARBON","DTM","DTW","EVI","GEO","GEOLOGIC_A", "GEOLOGIC_U", "GEO_CODE",   "LITHOLOGY",
 #                 "NAMED_UNIT", "NDVI","NDWI","Precip","SCA","SHAPE_Area", "SHAPE_Leng", "SLP","TWI","WIP", "GEO"  )
 
 #subset for easier viewing and access
-all <- all[c("STUDY_AREA", "sample_nam","lat", "lon", "Cstock_g_c", "Cstock_g_REV", "Cstock_Mg_",   
-             "Cstock_MgREV","WIP","DEM","DTW", "PRECIP","SLP","TWI",
-             "NDVI_s_0_win","MNDWI_s_0_win", "EVI_s_0_win", "b10_s_0_win",
-             "NDVI_s_1_spr", "MNDWI_s_1_spr", "EVI_s_1_spr", "b10_s_1_spr",
-             "NDVI_s_2_sum",  "MNDWI_s_2_sum", "EVI_s_2_sum", "b10_s_2_sum",
-             "NDVI_s_3_aut",  "MNDWI_s_3_aut", "EVI_s_3_aut", "b10_s_3_aut", "GEO_7_22_22" )]
-colnames(all) <- c("STUDY_AREA", "NAME","lat", "lon","C_g_cm3","C_g_cm3_REV","C_Mg_ha", 
-                   "CARBON","WIP","DEM","DTW","PRECIP","SLP","TWI",
-                   "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
-                   "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
-                   "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
-                   "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut", "GEO" )
+all <- as.tibble(all) %>% dplyr::select(STUDY_AREA, sample_nam,lat, lon, 
+                            #Cstock_g_c, Cstock_g_REV, Cstock_Mg_,   
+                            Cstock_MgREV,WIP,DEM,DTW, PRECIP,SLP,TWI,
+                            NDVI_s_0_win,MNDWI_s_0_win, EVI_s_0_win, b10_s_0_win,
+                            NDVI_s_1_spr, MNDWI_s_1_spr, EVI_s_1_spr, b10_s_1_spr,
+                            NDVI_s_2_sum,  MNDWI_s_2_sum, EVI_s_2_sum, b10_s_2_sum,
+                            NDVI_s_3_aut,  MNDWI_s_3_aut, EVI_s_3_aut, b10_s_3_aut, GEO_7_22_22) %>%
+    stats::setNames(c("STUDY_AREA", "NAME","lat", "lon",
+                      #"C_g_cm3","C_g_cm3_REV","C_Mg_ha", 
+               "CARBON","WIP","DEM","DTW","PRECIP","SLP","TWI",
+               "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
+               "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
+               "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
+               "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut", "GEO" )) 
 names(all)
 #make this a factor
 all$GEO <- as.factor(all$GEO)
@@ -85,6 +88,14 @@ all_mat <- cor(all[, c("CARBON", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
 
 corrplot::corrplot(all_mat, method = "number", number.cex= 20/ncol(all))
 
+
+masInv <- head(arrange(all, desc(CARBON)), 3)
+corrplot::corrplot(cor(masInv[, c("CARBON", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
+                               "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
+                               "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
+                               "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
+                               "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut")]))
+
 ########### All data linear models ################################################################################
 
 
@@ -100,7 +111,7 @@ WIP_lm <- lm(log(CARBON) ~ WIP, data = all);summary(WIP_lm)
 #The regular GEO layer is actually way better than the binary class. 
 #But for the individual study areas the binary may be better
 
-lmer_mod <- lmer((CARBON) ~  WIP + log10(PRECIP)  + MNDWI_sum + (1|GEO) , data = all, REML = F);summary(lmer_mod)
+lmer_mod <- lmer((CARBON) ~  WIP + log10(PRECIP)  + MNDWI_sum + (1|GEO), data = all, REML = F);summary(lmer_mod)
 lmer_mod_log <- lmer(sqrt(CARBON) ~ WIP + log10(PRECIP) +  MNDWI_sum + (1|GEO), data = all, REML = F);summary(lmer_mod_log)
 
 
@@ -230,7 +241,7 @@ corrplot::corrplot(mat, method = "number", number.cex= 0.5)
 lasso(mas)
 
 #### Mashel linear mixed model with binary GEO as random effect
-mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + SLP + EVI_sum +  (1|GEO), data = mas, REML = F);summary(mas_mod)
+mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + SLP + (1|GEO), data = mas, REML = F);summary(mas_mod)
 mas_mod_log <- lmer(sqrt(CARBON) ~   WIP + MNDWI_sum + SLP + (1|GEO), data = mas, REML = F);summary(mas_mod_log)
 #### Mashel check some assumptions
 hist(resid(mas_mod))
@@ -550,24 +561,33 @@ library(randomForest)
 library(datasets)
 library(caret)
 
-rf_data <- all[c("STUDY_AREA", "lon", "lat", "CARBON",
-             "Precip", "DTM", "DTW", "GEO_bin", "WIP",
-             "SLP", "TWI", "SCA", "NDVI")]
+#subset for easier viewing and access
+all <- read.csv("ANALYSIS/ALL_SOILC_7_31_22.csv")
 
-set.seed(222)
-ind <- sample(2, nrow(rf_data), replace = TRUE, prob = c(0.7, 0.3))
-train <- rf_data[ind == 1, ]
-test <- rf_data[ind == 2, ]
-rf <- randomForest(CARBON~., data = train, importance=TRUE, type = "regression", rsq = T)
+rf_data <- as.tibble(all) %>% dplyr::select(-NUM, -OID_, -sample_nam, -sample_name,
+                                            -Cstock_g_c, -Cstock_g_REV, -Cstock_Mg_,
+                                            -OLD_GEO, -OLD_GEO_CODE, -OLD_GEO_CLASS,
+                                            -OLD_GEO2, -AGE_LITH2,) #%>%
+rf_data2 <- as.tibble(all) %>% dplyr::select(Cstock_MgREV, WIP,    NDVI_s_0_win,  b3_s_2_sum,    lon,    b2_s_1_spr,   
+                                            MNDWI_s_2_sum, DEM) 
+
+set.seed(22)
+ind <- sample(2, nrow(rf_data2), replace = TRUE, prob = c(0.7, 0.3))
+train <- rf_data2[ind == 1, ]
+test <- rf_data2[ind == 2, ]
+rf <- randomForest(Cstock_MgREV~., data = train, importance=TRUE, type = "regression", rsq = T)
 print(rf)
 
 p1 <- predict(rf, newdata = test)
 varImpPlot(rf)
+vf <- as.data.frame(varImp(rf))
+rownames(vf)[order(vf$Overall, decreasing=TRUE)][1:10]
+
 
 rf$rsq[length(rf$rsq)]
 rf$predicted
 
-plot(rf$predicted, train$CARBON)
+plot(rf$predicted, train$Cstock_MgREV)
 
 getTree(rf, k = 55)
 
