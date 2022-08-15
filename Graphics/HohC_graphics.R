@@ -1,5 +1,7 @@
 library(ggplot2)
 library(terra)
+library(raster)
+library(rgdal)
 library(plotly)
 library(rasterVis)
 library(rayshader)
@@ -17,7 +19,9 @@ library(MetBrewer)
 #setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/")
 setwd("/Users/ajs0428/OneDrive - UW/University of Washington/Data and Modeling/") #Windows
 
-hoh_poly <- sf::read_sf("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp")
+agb <- raster::raster("AGB/WA_Biomass/AGB_Forest_NW_USA_2015.tif")
+hoh_poly <- readOGR("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp")
+hoh_poly_rpj <- spTransform(hoh_poly, crs(agb))
 wet_mask <- rast("SOIL CARBON/HOH_CARBON_7_20_22_WIP_wet_mask-Anthony's MacBook Pro-2.tif")
 upl_mask <- rast('SOIL CARBON/HOH_CARBON_7_20_22_WIP_upl_mask.tif')
 carbon <- rast("SOIL CARBON/HOH_CARBON_7_20_22_mask.tif")
@@ -26,9 +30,10 @@ WIP <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_fill.
 #slp <- raster::raster("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/")
 #asp <- raster::terrain(dem, opt = "aspect", filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_aspect.tif", overwrite = T)
 hs <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif")#raster::hillShade(slp, asp, 40, 270, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif", overwrite = T)
-agb <- rast("AGB/WA_Biomass/HOH_AGB_Forest_NW_USA_2016.tif")
-#agb_rpj <- project(agb, carbon, filename = "AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2016.tif", overwrite = T)
-agb_rpj <- rast("AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2016.tif")
+
+#agb_rpj <- project(agb, crs(hoh_poly), filename = "AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2015.tif", overwrite = T)
+agb_crop_mask <- raster::mask(agb, hoh_poly_rpj, filename = "AGB/WA_Biomass/HOH_rpj_crop_mask_AGB_Forest_NW_USA_2015.tif", overwrite = TRUE)
+#agb_rpj <- rast("AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2015.tif")
 #values(agb_rpj) <- values(agb) 
 
 # #wet_mat <- NULL#raster::as.matrix(wet_mask, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_wet_mat.mtx")
