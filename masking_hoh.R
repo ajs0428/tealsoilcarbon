@@ -32,7 +32,7 @@ setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/S
 #                     overwrite = TRUE)
 
 #### START HERE ####
-hoh_C_mask0 <- rast("HOH_CARBON_7_31_22_mask0.tif") #CHANGE THIS AFTER LOOKING AT MODEL AGAIN
+hoh_C_mask0 <- rast("HOH_CARBON_8_9_22_RSmask0.tif") #CHANGE THIS AFTER LOOKING AT MODEL AGAIN
 
 plot(hoh_C_mask0)
 

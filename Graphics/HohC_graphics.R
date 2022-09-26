@@ -5,6 +5,7 @@ library(rgdal)
 library(plotly)
 library(rasterVis)
 library(rayshader)
+library(magick)
 library(rgl)
 library(viridis)
 library(sf)
@@ -12,33 +13,45 @@ library(sf)
 library(RColorBrewer)
 library(magick)
 library(MetBrewer)
+library(webshot)
+library(webshot2)
 
 #USE METBREWER PACKAGE FOR PALETTE
 
 
-#setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/")
-setwd("/Users/ajs0428/OneDrive - UW/University of Washington/Data and Modeling/") #Windows
+setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/")
+#setwd("/Users/ajs0428/OneDrive - UW/University of Washington/Data and Modeling/") #Windows
 
-agb <- raster::raster("AGB/WA_Biomass/AGB_Forest_NW_USA_2015.tif")
-hoh_poly <- readOGR("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp")
-hoh_poly_rpj <- spTransform(hoh_poly, crs(agb))
-wet_mask <- rast("SOIL CARBON/HOH_CARBON_7_20_22_WIP_wet_mask-Anthony's MacBook Pro-2.tif")
-upl_mask <- rast('SOIL CARBON/HOH_CARBON_7_20_22_WIP_upl_mask.tif')
-carbon <- rast("SOIL CARBON/HOH_CARBON_7_20_22_mask.tif")
-dem <- raster::raster("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_dtm_resamp_7_23.tif")#raster::resample(dem, carbon, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_dtm_resamp_7_23.tif")#
-WIP <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_fill.tif")
+agb_hoh12 <- rast("AGB/WA_Biomass/hoh_2012.tif")
+agb_hoh13 <- rast("AGB/WA_Biomass/hoh_2013.tif")
+hoh_poly <- vect("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp")
+hoh_poly_rpj <- terra::project(hoh_poly, "EPSG:5070")
+#wet_mask <- rast("SOIL CARBON/HOH_CARBON_")
+#$upl_mask <- rast('SOIL CARBON/HOH_CARBON_7_20_22_WIP_upl_mask.tif')
+#### Main Layers ####
+soil_C <- rast("SOIL CARBON/HOH_CARBON_8_9_22_RSmask0.tif")
+upl_soil_C <- rast("SOIL CARBON/hohC_mask0_upl.tif")
+wet_soil_C <- rast("SOIL CARBON/hohC_mask0_wet.tif")
+bet_soil_C <- rast("SOIL CARBON/hohC_mask0_between.tif")
+NWI_soil_C <- rast("SOIL CARBON/HOH_NWI_CARBON_8_10_22_RS_mask0.tif")
+SG_soil_C <- rast("SOIL CARBON/OTHER_DATA/Hoh_soilgrids.tif")
+SG_wet_soil_C <- rast("SOIL CARBON/OTHER_DATA/Hoh_WIP_wet_soilgrids.tif")
+#dem <- raster::raster("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_dtm_resamp_7_23.tif")#raster::resample(dem, carbon, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_dtm_resamp_7_23.tif")#
+WIP <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_2022_fullmodel_v08/Hoh_2022_fullmodel_v08.tif")
 #slp <- raster::raster("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/")
 #asp <- raster::terrain(dem, opt = "aspect", filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_aspect.tif", overwrite = T)
-hs <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif")#raster::hillShade(slp, asp, 40, 270, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif", overwrite = T)
+#hs <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif")#raster::hillShade(slp, asp, 40, 270, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_HILLSHADE.tif", overwrite = T)
 
 #agb_rpj <- project(agb, crs(hoh_poly), filename = "AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2015.tif", overwrite = T)
-agb_crop_mask <- raster::mask(agb, hoh_poly_rpj, filename = "AGB/WA_Biomass/HOH_rpj_crop_mask_AGB_Forest_NW_USA_2015.tif", overwrite = TRUE)
-#agb_rpj <- rast("AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2015.tif")
+#agb_crop <- terra::crop(agb, hoh_poly_rpj)
+#agb_mask <- terra::mask(agb_crop, hoh_poly_rpj)
+#plot(agb_hoh13)#agb_rpj <- rast("AGB/WA_Biomass/HOH_rpj_AGB_Forest_NW_USA_2015.tif")
 #values(agb_rpj) <- values(agb) 
-
+#agb_hoh <- terra::merge(agb_hoh12, agb_hoh13)
+agb_hoh_rpj <- rast("AGB/HOH/Hudak_Lidar_AGB.tif") #terra::project(agb_hoh, crs(WIP), filename = "AGB/HOH/Hudak_Lidar_AGB.tif")
 # #wet_mat <- NULL#raster::as.matrix(wet_mask, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_wet_mat.mtx")
 # #upl_mat <- raster_to_matrix(upl_mask)
-carbon_mat <- as.matrix(carbon, na.rm = TRUE)#as.matrix(carbon, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/carbon_mat") #as.matrix(carbon)
+#carbon_mat <- as.matrix(carbon, na.rm = TRUE)#as.matrix(carbon, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/carbon_mat") #as.matrix(carbon)
 # 
 # 
 # #plot(hs, col=grey(0:100/100), legend=FALSE)
@@ -51,68 +64,140 @@ carbon_mat <- as.matrix(carbon, na.rm = TRUE)#as.matrix(carbon, filename = "SPAT
 # 
 # rgl.snapshot('ANALYSIS/R/Graphics/All_Carbon.png', fmt = 'png')
 
+wid <- (ext(agb_hoh_rpj)$xmax - ext(agb_hoh_rpj)$xmin)/10000
+hei <- (ext(agb_hoh_rpj)$ymax - ext(agb_hoh_rpj)$ymin)/10000
 #work on this
-agbC <- gplot(agb_rpj, maxpixels=3500000) + geom_raster(aes(fill = value*0.5)) +
-    scale_fill_viridis("Aboveground Carbon \nStock Mg/ha \n \n", 
-                       option = "viridis", 
+(agbC <- gplot(agb_hoh_rpj, maxpixels=200000) + geom_tile(aes(fill = value*0.5)) +
+    scale_fill_gradientn("Aboveground Carbon \nStock Mg/ha \n \n", 
+                         colors = brewer.pal(9, "Greens"), 
                        na.value = "white", 
-                       limits = c(0, 400)) +
-    theme_void()
+                       limits = c(0, 800)) +
+    theme(legend.position="bottom", legend.box = "horizontal",
+          panel.background = element_blank(),
+          axis.text = element_blank(),
+          axis.title = element_blank(),
+          axis.ticks = element_blank()))
+    #theme_void())
 
-WIP_plot <- gplot(WIP, maxpixels=3500000) + geom_raster(aes(fill = value)) +
-  scale_fill_gradientn("Wetland To Upland", 
-                       colors = met.brewer("VanGogh3", direction = -1), 
+(WIP_plot <- gplot(WIP, maxpixels=200000) + geom_tile(aes(fill = value)) +
+  scale_fill_gradientn("Wetland To Upland\n", 
+                       #colors = met.brewer("Isfahan1", direction = 1, type = "continuous")[3:8], 
+                       colors = brewer.pal(9, "Blues"),
                        na.value = "white", 
-                       limits = c(0, 1)) +
-  theme(legend.position="Top", legend.box = "horizontal",
-        panel.background = element_blank(),
-        axis.text = element_blank(),
-        axis.title = element_blank(),
-        axis.ticks = element_blank()) #+ theme_void()
-
-allC <- gplot(carbon, maxpixels=3500000) + geom_raster(aes(fill = value)) +
-    scale_fill_gradientn("Soil Carbon Stock Mg/ha", 
-                         colors = met.brewer('Nattier', override.order = T, 6), 
-                         na.value = "white", 
-                         limits = c(0, 800)) +
+                      limits = c(0, 1)) + 
   theme(legend.position="bottom", legend.box = "horizontal",
         panel.background = element_blank(),
         axis.text = element_blank(),
         axis.title = element_blank(),
-        axis.ticks = element_blank()) #+ theme_void()
+        axis.ticks = element_blank())) #+
+  #theme_void())
 
-uplC <- gplot(wet_mask, maxpixels=3500000) + geom_raster(aes(fill = value)) +
-  scale_fill_viridis("Soil Carbon \nStock Mg/ha \n \n", 
-                     option = "magma", 
-                     na.value = "white", 
-                     limits = c(0, 800)) +
-  theme_void()
-wetC <- gplot(upl_mask, maxpixels=3500000) + geom_raster(aes(fill = value)) +
-  scale_fill_viridis("Soil Carbon \nStock Mg/ha \n \n", 
-                     option = "magma", 
-                     na.value = "white", 
-                     limits = c(0, 800)) +
-  theme_void()
+#### Color schemes ####
+allC_col <- scale_fill_gradientn("Soil Carbon Stock Mg/ha", 
+                         colors = met.brewer('Demuth', type = "continuous", direction = -1)[3:10], 
+                         na.value = "white", 
+                         limits = c(0, 800))
+uplC_col <- scale_fill_gradientn("Soil Carbon \nStock Mg/ha \n \n", 
+                               colors = met.brewer('Demuth', type = "continuous", direction = -1)[3:10], 
+                               na.value = "white", 
+                               limits = c(0, 800)) 
+wetC_col <- scale_fill_gradientn("Soil Carbon \nStock Mg/ha \n \n", 
+                               colors = met.brewer('Demuth', type = "continuous", direction = -1)[3:10], 
+                               na.value = "white", 
+                               limits = c(0, 800))
+betC_col <- scale_fill_gradientn("Soil Carbon \nStock Mg/ha \n \n", 
+                               colors = met.brewer('Demuth', type = "continuous", direction = -1)[3:10], 
+                               na.value = "white", 
+                               limits = c(0, 800)) 
+NWIC_col <- scale_fill_viridis("Soil Carbon \nStock Mg/ha \n \n", 
+                               option = "viridis", 
+                               na.value = "white", 
+                               limits = c(0, 800)) 
+SGC_col <- scale_fill_viridis("Soil Carbon \nStock 30 cm Mg/ha \n \n", 
+                               option = "cividis", 
+                               na.value = "white", 
+                               limits = c(0, 200)) 
 
-plot_gg(agbC, multicore = TRUE, raytrace = TRUE, width = 6, height = 4, 
-        pointcontract = 1, scale = 125,zoom = 0.6, phi = 30, theta = 30)
-render_snapshot('SOIL CARBON/ANALYSIS/R/Graphics/AGC_HOH_3D.png', clear = T)
+#### Plotting function ####
+TwoD_plot <- function(layer, col){
+    gplot(layer, maxpixels=200000) +geom_tile(aes(fill = value)) +
+        col +
+        theme(legend.position="bottom", legend.box = "horizontal",
+              legend.background = element_rect(fill = "white"),
+              legend.key = element_rect(fill = "white"),
+              panel.background = element_rect(fill = "white"),
+              axis.text = element_blank(),
+              axis.title = element_blank(),
+              axis.ticks = element_blank(),
+              panel.border = element_blank(),
+              panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              plot.background = element_rect(fill = "white"))
+}
+(soilC_plt <- TwoD_plot(soil_C, allC_col))
+(uplsoilC_plt <-TwoD_plot(upl_soil_C, allC_col))
+(wetsoilC_plt <-TwoD_plot(wet_soil_C, allC_col))
+(betsoilC_plt <-TwoD_plot(bet_soil_C, allC_col))
+(nwisoilC_plt <-TwoD_plot(NWI_soil_C, allC_col))
+(sgsoilC_plt <-TwoD_plot(SG_soil_C, SGC_col))
+(sgwetsoilC_plt <-TwoD_plot(SG_wet_soil_C, SGC_col))
 
-plot_gg(WIP_plot, shadow_intensity =1, multicore = TRUE, raytrace = FALSE, width = 6, height = 4, 
-        pointcontract = 1, scale = 1,zoom = 0.6, phi = 30, theta = 30,
-        invert = F, reduce_size = 0.4)
-render_snapshot('SOIL CARBON/ANALYSIS/R/Graphics/WIP_3D.png', clear = T)
-save_obj('SOIL CARBON/ANALYSIS/R/Graphics/All_Carbon.obj')
-plot_gg(allC, multicore = TRUE, raytrace = TRUE, width = 6, height = 4, 
-        pointcontract = 1, scale = 150,zoom = 0.6, phi = 30, theta = 30,
-        invert = F, reduce_size = 0.4)
-render_snapshot('SOIL CARBON/ANALYSIS/R/Graphics/All_Carbon3D_Degas.png', clear = T)
 
-plot_gg(uplC, multicore = TRUE, raytrace = TRUE, width = 7, height = 4, 
-        scale = 125,zoom = 0.6, phi = 30, theta = 30)
 
-plot_gg(wetC, multicore = TRUE, raytrace = TRUE, width = 7, height = 4, 
-        scale = 125,zoom = 0.6, phi = 30, theta = 30)
+#### Rayshader Plots ####
+plot_gg(agbC, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 150,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/AGC_HOH_3D.png', fmt = "png",
+           width = 4000, height = 3600, webshot = TRUE)
+
+plot_gg(WIP_plot, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 1,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/WIP_3D.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+#save_obj('SOIL CARBON/ANALYSIS/R/Graphics/All_Carbon.obj')
+
+options(rgl.printRglwidget = TRUE)
+#### Soil Rayshader ####
+plot_gg(soilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 150,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+render_snapshot(filename = "SOIL CARBON/ANALYSIS/R/Graphics/hohsoilC_plt_check.png", clear = T)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohsoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(uplsoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 150,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohuplsoilC_plt.png' ,fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(wetsoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 150,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohwetsoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(betsoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 125,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohbetsoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(nwisoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 125,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohnwisoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(sgsoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 125,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohsgsoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+plot_gg(sgwetsoilC_plt, multicore = TRUE, raytrace = TRUE, width = wid, height = hei, 
+        pointcontract = 0.5, scale = 125,zoom = 0.8, phi = 35, theta = 315,
+        shadow_intensity = 0.5, soliddepth = 0, reduce_size = 0.5)
+snapshot3d('SOIL CARBON/ANALYSIS/R/Graphics/hohsgwetsoilC_plt.png', fmt = "png",
+                width = 4000, height = 3600, webshot = TRUE)
+
+
 
 
 degas_pal <- met.brewer("Degas", 5) 

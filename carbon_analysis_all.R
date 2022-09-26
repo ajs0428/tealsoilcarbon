@@ -1,16 +1,16 @@
 library(stats)
 library(tidyverse)
-library(ggplot2)
 library(lme4)
 library(lmerTest)
 library(emmeans)
-library(raster)
-library(terra)
-library(rgdal)
+library(terra, raster, rgdal)
 library(corrplot)
 library(glmnet)
 library(merTools)
 library(randomForest)
+library(caret)
+library(cvms)
+library(groupdata2)
 library(mgcv)
 library(gstat)
 library(mapview)
@@ -37,29 +37,49 @@ all_csv <- read.csv("ANALYSIS/ALL_SOILC_8_7_22_NEWWIP.csv")
 
 #subset for easier viewing and access
 all <- as_tibble(all_csv) %>% dplyr::select(STUDY_AREA, sample_nam,lat, lon,
-                            Cstock_MgREV, Cstock_MgREV_1m, DEM,DTW, PRECIP,SLP,TWI,
+                            Cstock_MgREV, Cstock_MgREV_1m, max_depth, DEM,DTW, PRECIP,SLP,TWI,
                             NDVI_s_0_win,MNDWI_s_0_win, EVI_s_0_win, b10_s_0_win,
                             NDVI_s_1_spr, MNDWI_s_1_spr, EVI_s_1_spr, b10_s_1_spr,
                             NDVI_s_2_sum,  MNDWI_s_2_sum, EVI_s_2_sum, b10_s_2_sum,
                             NDVI_s_3_aut,  MNDWI_s_3_aut, EVI_s_3_aut, b10_s_3_aut, 
                             GEO_8_6_22, WIP_INV,
-                            b2_s_1_spr, b3_s_2_sum, b1_s_1_spr, b3_s_2_sum, b5_s_2_sum, b5_s_3_aut, b8_s_2_sum) %>%
+                            b2_s_1_spr, b3_s_2_sum, b1_s_1_spr,  b5_s_2_sum, b5_s_3_aut, b8_s_2_sum) %>%
     stats::setNames(c("STUDY_AREA", "NAME","lat", "lon", 
-               "CARBON", "CARBON_1M", "DEM","DTW","PRECIP","SLP","TWI",
+               "CARBON", "CARBON_1M", "max_depth", "DEM","DTW","PRECIP","SLP","TWI",
                "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
                "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
                "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
                "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut", 
                "GEO",   "WIP",
-               "b2_s_1_spr", "b3_s_2_sum", "b1_s_1_spr", "b3_s_2_sum", "b5_s_2_sum", "b5_s_3_aut", "b8_s_2_sum"))
-all$MNDWI_sum_scale <- all$MNDWI_sum/sd(all$MNDWI_sum)
-all$b3_s_2_sum_scale <- all$b3_s_2_sum/sd(all$b3_s_2_sum)
+               "b2_s_1_spr", "b3_s_2_sum", "b1_s_1_spr",  "b5_s_2_sum", "b5_s_3_aut", "b8_s_2_sum"))
+#all$MNDWI_sum_scale <- all$MNDWI_sum/sd(all$MNDWI_sum)
+#all$b3_s_2_sum_scale <- all$b3_s_2_sum/sd(all$b3_s_2_sum)
 names(all)
 #make this a factor
 all$GEO <- as.factor(all$GEO)
-all$WIP2 <- (all$WIP)**2
-all$b8_s_2_sum <- all_csv$b8_s_2_sum # WHY?
+
+all <- all %>% mutate(wetrivup = ifelse(GEO == "Quaternary", "RIV", ifelse(WIP> 0.5, "WET", "UPL")))
+#all$WIP2 <- (all$WIP)**2
+#all$b8_s_2_sum <- all_csv$b8_s_2_sum # WHY?
 #all$GEO <- as.factor(all$GEO)
+
+# Bar plot for factors
+hoh_fac <-subset(all, STUDY_AREA == "HOH")
+grouped <- hoh_fac %>% group_by(wetrivup)
+summ_hoh <- summarise(grouped, mean=mean(CARBON), sd=sd(CARBON), count = n())
+summ_hoh$se <- summ_hoh$sd/sqrt(summ_hoh$count)
+summ_hoh$lwr <- summ_hoh$mean - summ_hoh$se
+summ_hoh$upr <- summ_hoh$mean + summ_hoh$se
+
+ggplot(summ_hoh) +
+    geom_bar(aes(x = wetrivup, y = mean, fill = wetrivup), stat = "identity") +#geom_bar(stat = "summary", fun = 'mean') +
+    geom_errorbar(aes(wetrivup, ymin = lwr, ymax = upr), width = 0.2) +
+    xlab("") + ylab('Soil Carbon Stock (Mg/ha)') +
+    scale_fill_manual(values = c("#04395E", "#DAB785", "#70A288")) +
+    scale_y_continuous(expand = c(0,0)) +
+    theme(panel.background = element_blank(), 
+          axis.line = element_line(),
+          text = element_text(size = 30))
 
 # R^2 function from Chad - lmer doesn't seem to give it
 r.sq <- function(y,y.fitted){
@@ -89,7 +109,7 @@ lasso <- function(df){
 }
 
 ######Correlation plot
-all_mat <- cor(all[, c("CARBON", "CARBON_1M", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
+all_mat <- cor(all[, c("CARBON", "CARBON_1M", 'max_depth', "WIP","DEM","DTW", "PRECIP","SLP","TWI",
                                    "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
                                    "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
                                    "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
@@ -99,7 +119,7 @@ corrplot::corrplot(all_mat, method = "number", number.cex= 15/ncol(all))
 
 
 masInv <- head(arrange(all, desc(CARBON)), 3)
-corrplot::corrplot(cor(masInv[, c("CARBON", "CARBON_1M", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
+corrplot::corrplot(cor(masInv[, c("CARBON", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
                                "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
                                "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
                                "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
@@ -133,7 +153,7 @@ ggplot() +
 
 
 #LASSO for all data
-lass0 <- as.data.frame(lasso(all_csv))
+lass0 <- (lasso(all_csv))
 summ <- summary(lass0)
 lass0_df <- data.frame(Var = rownames(lass0)[summ$i],
            LassWeight = summ$x)
@@ -141,14 +161,14 @@ lass0_df <- lass0_df[order(-lass0_df$LassWeight),]
 
 
 #Linear model for WIP relationship
-WIP_lm <- lm(log(CARBON) ~ WIP, data = all);summary(WIP_lm)
+WIP_lm <- lm(log(CARBON) ~ max_depth, data = all);summary(WIP_lm)
 
 #linear mixed model with the binary class as random effect
 #The regular GEO layer is actually way better than the binary class. 
 #But for the individual study areas the binary may be better
 
-lmer_mod <- lmer((CARBON_1M) ~  (WIP) + MNDWI_sum + (log10(PRECIP)|GEO), data = all, REML = F);summary(lmer_mod)
-lmer_mod_log <- lmer(log10(CARBON) ~  (WIP) + MNDWI_sum + (log10(PRECIP)|GEO), data = all, REML = F);summary(lmer_mod_log)
+lmer_mod <- lmer((CARBON) ~  (WIP) + MNDWI_sum + max_depth + (1|STUDY_AREA:GEO), data = all, REML = F);summary(lmer_mod)
+lmer_mod_log <- lmer(log10(CARBON) ~  (WIP) + MNDWI_sum + (1|STUDY_AREA:GEO), data = all, REML = F);summary(lmer_mod_log)
 
 
 #check some assumptions
@@ -160,11 +180,11 @@ plot(predict(lmer_mod_log), resid(lmer_mod_log)) #This is better
 
 #evaluate the nonlog model
 anova(lmer_mod) #check on factors, none significant, not sure how to interpret
-r.sq(all$CARBON_1M, fitted(lmer_mod)) 
+r.sq(all$CARBON, fitted(lmer_mod)) 
 
 #evaluate the log model
 anova(lmer_mod_log) #check on factors, none significant, not sure how to interpret
-r.sq(log10(all$CARBON_1M), fitted(lmer_mod_log)) 
+r.sq(log10(all$CARBON), fitted(lmer_mod_log)) 
 
 #checking other factors with carbon  
 # plot(predict(lmer_mod), all$CARBON, col = as.factor(all$STUDY_AREA),  pch = 19)
@@ -172,9 +192,9 @@ r.sq(log10(all$CARBON_1M), fitted(lmer_mod_log))
 # legend("bottomright", legend = paste("Group", 1:3), col = 1:6, pch = 19, bty = "n")
 
 ggplot() +
-    geom_point(aes(y = predict(lmer_mod), x = (all$CARBON_1M), colour =  as.factor(all$GEO), size = 3)) +
+    geom_point(aes(y = predict(lmer_mod), x = (all$CARBON), colour =  as.factor(all$WIP >0.5), size = 3)) +
     xlab("Actual Soil C (Mg/ha)") + ylab('Predicted Soil C (Mg/ha)') +
-    geom_smooth(aes(y = predict(lmer_mod), x = (all$CARBON_1M)), method = "lm", se = F) +
+    geom_smooth(aes(y = predict(lmer_mod), x = (all$CARBON)), method = "lm", se = F) +
     geom_abline(intercept = 0, slope = 1, size = 0.5, linetype = "dashed") +
     #scale_color_manual(labels = c("Riverine", "Non-Riverine"), values = c("blue", "red")) +
     #labs(colour = "Random Effect") +
@@ -184,18 +204,58 @@ all_names <- names(fixef(lmer_mod_log))
 all_vals <- c( unname(fixef(lmer_mod_log)) )
 all_plot_dat <- data.frame(all_names, all_vals)
 
+
 ggplot(all_plot_dat, aes(all_names, all_vals)) +
     geom_col() + xlab("Fixed Coefficients") + ylab('Coefficient Value (Mg/ha)') +
     theme(text = element_text(size = 20))
 
 
+#### All model 10 fold cross validation ####
+lmer_form <- c("CARBON ~  WIP + MNDWI_sum + (1|STUDY_AREA:GEO)")
+
+set.seed(7)
+fold_dat <- fold(data = all, k = 10) %>% 
+    arrange(.folds)
+CV1 <- cross_validate(
+    data = fold_dat,
+    formulas = lmer_form,
+    family = "gaussian",
+    REML = F
+)
+cv_preds <- CV1$Predictions[[1]] #as.data.frame(CV1$Predictions)
+cv_preds %>% 
+    group_by(Fold) %>% 
+    evaluate(
+        target_col = "Target",
+        prediction_cols = "Prediction",
+        type = "gaussian"
+    )
+plot(cv_preds$Target, cv_preds$Prediction)
+r.sq(cv_preds$Target, cv_preds$Prediction) 
+
+pred_cv <- cvms::predict_functions("lmer")
 
 ########### Separate Study Area data linear models ################################################################################
 
 
 ##### Dataframe setup - skip GEO, already in dataframe #############
 hoh <- subset(all, STUDY_AREA == "HOH")
-hoh_csv <- subset(all_csv, STUDY_AREA == "HOH")
+hoh_csv <- read.csv("ANALYSIS/HOH_SOILC_8_16_22_TH.csv")#subset(all_csv, STUDY_AREA == "HOH")
+hoh<- as_tibble(hoh_csv) %>% dplyr::select(STUDY_AREA, sample_nam,lat, lon,
+                                     Cstock_MgREV, Cstock_MgREV_1m, DEM,DTW, PRECIP,SLP,TWI,
+                                     NDVI_s_0_win,MNDWI_s_0_win, EVI_s_0_win, b10_s_0_win,
+                                     NDVI_s_1_spr, MNDWI_s_1_spr, EVI_s_1_spr, b10_s_1_spr,
+                                     NDVI_s_2_sum,  MNDWI_s_2_sum, EVI_s_2_sum, b10_s_2_sum,
+                                     NDVI_s_3_aut,  MNDWI_s_3_aut, EVI_s_3_aut, b10_s_3_aut, 
+                                     GEO_8_6_22, WIP_INV, treeheight.Hoh_TreeHeight) %>%
+    stats::setNames(c("STUDY_AREA", "NAME","lat", "lon", 
+                      "CARBON", "CARBON_1M", "DEM","DTW","PRECIP","SLP","TWI",
+                      "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
+                      "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
+                      "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
+                      "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut", 
+                      "GEO",   "WIP","TREE_H"))
+
 col <- subset(all, STUDY_AREA == "COL")
 mas <- subset(all, STUDY_AREA == "MAS")
 
@@ -207,10 +267,11 @@ mas <- subset(all, STUDY_AREA == "MAS")
 
 
 ###### Doing LASSO regression to identify variables
-
+hoh_csv_wipsub <- subset(hoh_csv, hoh_csv$WIP_INV > 0.5)
 lasso(hoh_csv) # for hoh
+hoh_wipsub <- subset(hoh, hoh$WIP>0.)
 
-hoh_mat <- cor(hoh[, c("CARBON_1M", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
+hoh_mat <- cor(hoh_wipsub[, c("CARBON", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
                        "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
                        "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
                        "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
@@ -218,9 +279,10 @@ hoh_mat <- cor(hoh[, c("CARBON_1M", "WIP","DEM","DTW", "PRECIP","SLP","TWI",
 
 corrplot::corrplot(hoh_mat, method = "number", number.cex= 0.5)
 
+
 # Taking the coefs from the LASSO results 
 #removed SCA since it improved the AIC/BIC
-hoh_mod <- lmer((CARBON) ~   WIP  + MNDWI_sum + (1|GEO), data = hoh, REML = F);summary(hoh_mod) #nonlog model
+hoh_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + (1|GEO), data = hoh, REML = F);summary(hoh_mod) #nonlog model
 hoh_mod_log <- lmer(sqrt(CARBON) ~   WIP +   MNDWI_sum + (1|GEO), data = hoh, REML = F);summary(hoh_mod_log)
 ####### Hoh evaluate the log model
 anova(hoh_mod) #check on factors, none significant, not sure how to interpret
@@ -271,7 +333,7 @@ corrplot::corrplot(mat, method = "number", number.cex= 0.5)
 lasso(mas)
 
 #### Mashel linear mixed model with binary GEO as random effect
-mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + SLP + (1|GEO), data = mas, REML = F);summary(mas_mod)
+mas_mod <- lmer((CARBON) ~  WIP + MNDWI_sum + SLP + TWI + (1|GEO), data = mas, REML = F);summary(mas_mod)
 mas_mod_log <- lmer(sqrt(CARBON) ~   WIP + MNDWI_sum + SLP + (1|GEO), data = mas, REML = F);summary(mas_mod_log)
 #### Mashel check some assumptions
 hist(resid(mas_mod))
@@ -321,7 +383,7 @@ corrplot::corrplot(mat, method = "number", number.cex= 0.5)
 lasso(col) #weird
 
 #### Colville linear mixed model with binary GEO as random effect
-col_mod <- lmer((CARBON) ~  WIP  +  log10(PRECIP) + (1|GEO), data = col, REML = F);summary(col_mod)
+col_mod <- lmer((CARBON) ~  WIP  + log10(PRECIP) + (1|GEO), data = col, REML = F);summary(col_mod)
 col_mod_log <- lmer(sqrt(CARBON) ~   WIP  + PRECIP   +(1|GEO), data = col, REML = F);summary(col_mod_log)
 #### Colville check some assumptions
 hist(resid(col_mod))
@@ -399,7 +461,9 @@ PRECIP <-rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_precip_rsmpl.tif")
 #SCA <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_sca_rsmpl.tif")
 #WIP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_fill.tif")
 WIP <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_2022_fullmodel_v08/Hoh_2022_fullmodel_v08.tif")
-#WIP <- 1-WIP2
+STUDY <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_STUDY.tif")
+#rasterize(STUDY, WIP, field = "value", filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_STUDY.tif", overwrite = T)
+plot(STUDY)
 GEO <- rast( "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_R_GEO_CROP_AGG.tif")
 #NDVI_SPR <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_spec_5yr_sea1.tif")[['SR_B5']] #seasons 0 = win, 1 = spr, 2 = sum, 3 = fall
 #NDVI_SPR_R <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_NDVI_SPR_R.tif")#terra::resample(NDVI_SPR, WIP, method = "bilinear", filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_NDVI_SPR_R.tif")
@@ -416,7 +480,7 @@ B3_SUM_R <- rast("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_B3_SUM_R.tif")#t
 #Check extents
 #TWI is weird, might have to address in ArcGIS 
 #For now just match extent with nearest neighbor resampling 
-ext(WIP) == ext(SLP)
+ext(WIP) == ext(STUDY)
 ext(WIP) == ext(PRECIP)
 
 terra::plot(B3_SUM_R, main = "1-WIP2")
@@ -429,11 +493,11 @@ terra::plot(B3_SUM_R, main = "1-WIP2")
 
 #stack rasters from model see below
             #lmer_mod <- lmer((CARBON) ~  WIP +  log10(PRECIP) + NDVI_spr + MNDWI_sum + (1|GEO)
-rs <- c(WIP, PRECIP,  MNDWI_SUM_R, GEO)
+rs <- c(WIP, PRECIP,  MNDWI_SUM_R, STUDY, GEO)
 
 
 #Change names to match the dataframe extraction I think...
-names(rs) <- c("WIP", "PRECIP",  "MNDWI_sum", "GEO")
+names(rs) <- c("WIP", "PRECIP",  "MNDWI_sum", "STUDY_AREA","GEO")
 #names(rs) <- c("SCA", "WIP", "TWI",  "GEO")
 
 #looking at coefficients for fixed and random effects
@@ -444,7 +508,7 @@ rands <- ranef(lmer_mod) #random
 # the old way of using just the coefs doesn't work because I don't know 
 # how to apply a random effect
 #Pred <- (DTW*betas[2]) + (TWI_rspl*betas[3] + (WIP*betas[4]) + betas[4])
-Pred <- terra::predict(rs, hoh_mod, allow.new.levels = TRUE, filename = "HOHMOD_CARBON_8_10_22_RanSLP.tif", overwrite = TRUE)
+Pred <- terra::predict(rs, lmer_mod, se.fit = TRUE, allow.new.levels = TRUE, filename = "TEST_CONF_HOH_CARBON_8_27_22_RanSLP.tif", overwrite = TRUE)
 plot(Pred)
 
 # predfun <- function(model, data) {
@@ -591,16 +655,16 @@ all_csv <- read.csv("ANALYSIS/ALL_SOILC_8_7_22_NEWWIP.csv")
 rf_data <- as.tibble(all_csv) %>% dplyr::select(-NUM, -OID_, -sample_nam, -sample_name, -WIP,
                                             -Cstock_g_c, -Cstock_g_REV, -Cstock_Mg_,
                                             -OLD_GEO, -OLD_GEO_CODE, -OLD_GEO_CLASS,
-                                            -OLD_GEO2, -AGE_LITH2, -STUDY_AREA, -GEO_7_22_22) #%>%
+                                            -OLD_GEO2, -AGE_LITH2, -STUDY_AREA, -GEO_7_22_22, -Cstock_MgREV_1m) #%>%
 rf_data2 <- as.tibble(all_csv) %>% dplyr::select(Cstock_MgREV, WIP_INV,    NDVI_s_0_win,  b3_s_2_sum,    lon,   
                                             b2_s_1_spr,  b9_s_0_win, SLP, b3_s_3_aut,  b1_s_1_spr,
                                             MNDWI_s_2_sum, b16_s_0_win, b3_s_1_spr, b4_s_0_win, b12_s_3_aut) 
 
 set.seed(22)
-ind <- sample(2, nrow(rf_data2), replace = TRUE, prob = c(0.7, 0.3))
-train <- rf_data2[ind == 1, ]
-test <- rf_data2[ind == 2, ]
-rf <- randomForest(Cstock_MgREV~., data = train, importance=TRUE, type = "regression", rsq = T)
+ind <- sample(2, nrow(rf_data), replace = TRUE, prob = c(0.7, 0.3))
+train <- rf_data[ind == 1, ]
+test <- rf_data[ind == 2, ]
+rf <- randomForest(Cstock_MgREV~., data = rf_data2, importance=TRUE, type = "regression", rsq = T, ntree =1000)
 print(rf)
 
 p1 <- predict(rf, newdata = test)
@@ -612,9 +676,9 @@ rownames(vf)[order(vf$Overall, decreasing=TRUE)][1:15]
 rf$rsq[length(rf$rsq)]
 rf$predicted
 
-plot(rf$predicted, train$Cstock_MgREV)
+plot(rf$predicted, rf_data$Cstock_MgREV)
 abline(1,1)
-abline(lm(train$Cstock_MgREV ~ rf$predicted,))
+abline(lm(rf_data$Cstock_MgREV ~ rf$predicted,))
 
 getTree(rf, k = 55)
 
@@ -623,28 +687,74 @@ getTree(rf, k = 55)
 ############# Boosted regression tree #################
 library(MASS)
 library(gbm)
+library(dismo)
 
-all_brt <- all %>% dplyr::select(-STUDY_AREA, -NAME, -WIP)
-train$GEO_8_6_22 <- as.factor(train$GEO_8_6_22)
-test$GEO_8_6_22 <- as.factor(test$GEO_8_6_22)
-brt <- gbm(log10(Cstock_MgREV) ~., data = train, distribution = "gaussian", n.trees = 10000, shrinkage = 0.01, interaction.depth = 4)
+all_brt <- all %>% dplyr::select(-NAME, -CARBON_1M, -lon, -lat)
+all_brt <- as.data.frame(all_brt)
+all_brt$GEO <- as.factor(all_brt$GEO)
+all_brt$STUDY_AREA <- as.factor(all_brt$STUDY_AREA)
+# train$GEO_8_6_22 <- as.factor(train$GEO_8_6_22)
+# test$GEO_8_6_22 <- as.factor(test$GEO_8_6_22)
+brt_step <- gbm.step(data = all_brt, gbm.x = c(1,3:30), gbm.y = c(2),
+                     family = "gaussian", learning.rate = 0.005, 
+                     tree.complexity = 5, bag.fraction = 0.75, n.trees = 50,
+                     tolerance.method = "fixed")
 
-summary(brt)
-plot(brt, i = "WIP_INV")
-plot(brt, i = "SLP")
+summary(brt_step)
+plot(brt_step, i = "WIP")
+plot(brt_step, i = "SLP")
 
-n.trees = seq(from = 100, to = 10000, by = 100)
-predmat = predict(brt, newdata = test, n.trees = n.trees)
-dim(predmat)
+brt_simp <- gbm.simplify(brt_step)
+summary(brt_simp)
 
-test.err = double(27)
-boost.err = with(test, apply( (predmat - Cstock_MgREV)^2, 2, mean) )
-plot(n.trees, boost.err, pch = 23, ylab = "Mean Squared Error", xlab = "# Trees", main = "Boosting Test Error")
-abline(h = min(test.err), col = "red")
+brt_step_simp <- gbm.step(all_brt, gbm.x = brt_simp$pred.list[[17]], gbm.y = 2,
+                          tree.complexity = 5, learning.rate = 0.005, 
+                          family = "gaussian", tolerance.method = "fixed")
+par(mar = c(1,1,1,1))
+gbm.plot(brt_step_simp, n.plots = 15, plot.layout = c(5,3), write.title = T,
+         lwd = 1)
+plot.layout = c(1,1)
+gbm.perspec(brt_step_simp, 2, 1)
 
-brt_pred <- predict(brt, test, n.trees = 500)
-plot(brt_pred, log10(test$Cstock_MgREV))
-r.sq(log10(train$Cstock_MgREV), brt_pred)
+preds_brt <- predict.gbm(brt_step_simp, all_brt, n.trees = brt_step_simp$n.trees,
+            type = "response")
+r.sq(all_brt$CARBON,preds_brt)
+
+brt_step_simp$weights
+
+#Here is the actual gradient boosting tree to use after determining from step
+step_dat <- as.data.frame((all_brt[brt_simp$pred.list[[17]]]))
+
+brt_gbm <- gbm(all_brt$CARBON ~ ., data = step_dat, distribution = "gaussian", 
+               bag.fraction = 0.75, cv.folds = 10, n.trees = 500)
+
+gbm.perf(brt_gbm)
+summary(brt_gbm$cv.error)
+r.sq(brt_gbm$fit, all_brt$CARBON)
+
+# n.trees = seq(from = 100, to = 10000, by = 100)
+# predmat = predict(brt, newdata = all_brt, n.trees = n.trees)
+# dim(predmat)
+
+# test.err = double(27)
+# boost.err = with(all_brt, apply( (predmat - CARBON)^2, 2, mean) )
+# plot(n.trees, boost.err, pch = 23, ylab = "Mean Squared Error", xlab = "# Trees", main = "Boosting Test Error")
+# abline(h = min(test.err), col = "red")
+# 
+# brt_pred <- predict(brt, all_brt, n.trees = 2000)
+# plot(brt_pred, (all_brt$CARBON))
+# r.sq((all_brt$CARBON), brt_pred)
+
+ggplot() +
+    geom_point(aes(y = brt_pred, x = (all_brt$CARBON), colour =  as.factor(all_brt$GEO), size = 3)) +
+    xlab("Actual Soil C (Mg/ha)") + ylab('Predicted Soil C (Mg/ha)') +
+    geom_smooth(aes(y = brt_pred, x = (all_brt$CARBON)), method = "lm", se = F) +
+    geom_abline(intercept = 0, slope = 1, size = 0.5, linetype = "dashed") +
+    #scale_color_manual(labels = c("Riverine", "Non-Riverine"), values = c("blue", "red")) +
+    #labs(colour = "Random Effect") +
+    theme(legend.position = 'none', text = element_text(size = 20))
+
+
 
 ################ PLSR ####################
 #ignore

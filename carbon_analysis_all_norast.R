@@ -125,7 +125,7 @@ r.sq(sqrt(all$CARBON), fitted(lmer_mod_log))
 
 #check the predictions of the model vs the actual 
 ggplot() +
-    geom_point(aes(y = predict(lmer_mod), x = all$CARBON, colour =  as.factor(all$GEO), size = 3)) +
+    geom_point(aes(y = predict(lmer_mod), x = all$CARBON, colour =  as.factor(all$WIP > 0.5), size = 3)) +
     xlab("Actual Soil C (Mg/ha)") + ylab('Predicted Soil C (Mg/ha)') +
     geom_smooth(aes(y = predict(lmer_mod), x = all$CARBON), method = "lm", se = FALSE) +
     #scale_color_manual(labels = c("Riverine", "Non-Riverine"), values = c("blue", "red")) +
@@ -133,8 +133,8 @@ ggplot() +
     theme(legend.position = 'none', text = element_text(size = 20))
 
 #Making an effects plot
-all_names <- names(fixef(lmer_mod_log))
-all_vals <- c( unname(fixef(lmer_mod_log)) )
+all_names <- names(fixef(lmer_mod))
+all_vals <- c( unname(fixef(lmer_mod)) )
 all_plot_dat <- data.frame(all_names, all_vals)
 
 ggplot(all_plot_dat, aes(all_names, all_vals)) +
