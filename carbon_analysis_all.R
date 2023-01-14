@@ -65,17 +65,21 @@ all <- all %>% mutate(wetrivup = ifelse(GEO == "Quaternary", "RIV", ifelse(WIP> 
 
 # Bar plot for factors
 hoh_fac <-subset(all, STUDY_AREA == "HOH")
-grouped <- hoh_fac %>% group_by(wetrivup)
+hoh_fac <- hoh_fac %>% mutate(wetupbetriv = case_when(WIP <=0.1 ~ "UPLAND",
+                                                      WIP >0.1 & WIP<0.5 ~ "WETFOR",
+                                                      WIP>=0.5 & GEO != "Quaternary"~ "WETLAND",
+                                                      WIP>=0.5 & GEO == "Quaternary" ~ "RIV"))
+grouped <- hoh_fac %>% group_by(wetupbetriv)
 summ_hoh <- summarise(grouped, mean=mean(CARBON), sd=sd(CARBON), count = n())
 summ_hoh$se <- summ_hoh$sd/sqrt(summ_hoh$count)
 summ_hoh$lwr <- summ_hoh$mean - summ_hoh$se
 summ_hoh$upr <- summ_hoh$mean + summ_hoh$se
 
 ggplot(summ_hoh) +
-    geom_bar(aes(x = wetrivup, y = mean, fill = wetrivup), stat = "identity") +#geom_bar(stat = "summary", fun = 'mean') +
-    geom_errorbar(aes(wetrivup, ymin = lwr, ymax = upr), width = 0.2) +
+    geom_bar(aes(x = wetupbetriv, y = mean, fill = wetupbetriv), stat = "identity") +#geom_bar(stat = "summary", fun = 'mean') +
+    geom_errorbar(aes(wetupbetriv, ymin = lwr, ymax = upr), width = 0.2) +
     xlab("") + ylab('Soil Carbon Stock (Mg/ha)') +
-    scale_fill_manual(values = c("#04395E", "#DAB785", "#70A288")) +
+    scale_fill_manual(values = c("#65a0c4" ,"#DAB785", "#95b99d", "#05aa74" )) +
     scale_y_continuous(expand = c(0,0)) +
     theme(panel.background = element_blank(), 
           axis.line = element_line(),

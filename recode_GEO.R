@@ -1,10 +1,33 @@
 library(terra)
 library(dplyr)
+library(rgdal)
+library(sf)
+library(tidyterra)
 
-setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/SOIL CARBON/')
+setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/')
+hoh_poly <- vect('SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp')
+
+wa_250 <- sf::st_read("SOIL CARBON/SPATIAL LAYERS/WA_GEO/ger_portal_surface_geology_250k/WGS_Surface_Geology_250k.gdb",
+                      layer = "MapUnitPolys")
+wa_250t <- vect(wa_250)
+wa_250tproj <- terra::project(wa_250t, "EPSG:26910")
+hoh_250 <- crop(wa_250tproj, hoh_poly)
+plot(hoh_250, "MapUnit")
+hoh_250_reclass <- hoh_250 |> tidyterra::mutate(MapUnit = case_when(MapUnit == "Qad_NW" ~ "Quat_old_clastic",
+                                                         MapUnit == "Qao_NW" ~ "Quat_old_alluv",
+                                                         MapUnit == "Qapo_NW" ~ "Quat_old_clastic",
+                                                         MapUnit == "Qapw(2)" ~ "Quat_old_clastic",
+                                                         MapUnit == "Qguc" ~ "Quat_old_clastic",
+                                                         MapUnit == "Qa_NW" ~ "Quat_new",
+                                                         MapUnit == "Qls_NW" ~ "Quat_new",
+                                                         MapUnit == "wtr_NW" ~ "Quat_new", 
+                                                         MapUnit == "MEm" ~ "MioEo",
+                                                         MapUnit == "MEmst" ~ "MioEo",
+                                                         TRUE ~ "MioEo")) 
+#hoh_250_reclass_tif <- rasterize(hoh_250_reclass, GEOm, field = "MapUnit", filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.tif")
+writeRaster(hoh_250_reclass, "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.")
 wa_geology <- vect("SPATIAL LAYERS/WA_GEO/WA_geologic_unit_poly_100k.shp")
 hoh_geology <- vect('SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_GEO_CLIP_7_22.shp')
-hoh_poly <- vect('SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp')
 plot(hoh_geology, "GEOLOGIC_A")
 col_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/colville_nwi_poly.shp")
 plot(col_poly)
@@ -18,16 +41,31 @@ plot(hoh_geo_crop, "GEOLOGIC_A", add = F)
 
 
 #Bring in points to visualize where they land
-pts <- read.csv("ANALYSIS/ALL_SOILC_7_31_22.csv")
-pts_vect <- vect(pts, geom = c("lon", "lat"))
-set.crs(pts_vect, "EPSG:4326")
-pts_vect <- terra::project(pts_vect, "EPSG:26910")
+pts <- read.csv("SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
+pts_vect <- vect(pts, geom = c("x", "y"))
+set.crs(pts_vect, "EPSG:26910")
+#pts_vect <- terra::project(pts_vect, "EPSG:26910")
+#hoh_pts_vect <- pts_vect[pts_vect$STUDY_AREA =="HOH"]
+#writeVector(hoh_pts_vect, filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_sample_points.shp", overwrite = T)
 #plot(pts_vect, add = T)
 # e <- c(405000,410000,529500, 530000)
 # zoom(hoh_geo_crop, "GEOLOGIC_A", e = e)
 # points(pts_vect)
-pts_extract <- extract(wa_geo_proj, pts_vect)
-names(pts_extract)
+pts_extract <- extract(hoh_250_reclass, pts_vect)
+# pts_extract <- pts_extract |> mutate(MapUnit = case_when(MapUnit == "Qad_NW" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qao_NW" ~ "Quat_old_alluv",
+#                                                          #MapUnit == "Qapo_NW" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qapw(2)" ~ "Quat_old_clastic",
+#                                                          #MapUnit == "Qguc" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qa_NW" ~ "Quat_new",
+#                                                          #MapUnit == "Qls_NW" ~ "Quat_new",
+#                                                          #MapUnit == "wtr_NW" ~ "Quat_new", 
+#                                                          MapUnit == "MEm" ~ "MioEo",
+#                                                          MapUnit == "MEmst" ~ "MioEo")) 
+hoh_csv <- read.csv("SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
+hoh_csv$GEO_250 <- pts_extract$MapUnit
+write.csv(hoh_csv, file = "SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
+unique(hoh_csv$GEO_250)
 
 # #####rename all Miocene in Hoh to Miocene-Eocene and Present to Holocen-Quaternary####
 # hoh_geo_crop$GEOLOGIC_A[hoh_geo_crop$GEOLOGIC_A == "Miocene"] <- "Miocene-Eocene"
