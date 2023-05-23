@@ -17,7 +17,7 @@ setwd("/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/"
 WIP <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_Mask0_10_2022.tif")#rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_2022_fullmodel_v08/Hoh_2022_fullmodel_v08.tif")
 agb <- rast("AGB/HOH/Hudak_AGB_WIPrspl.tif")
 agb <- agb*0.5
-soil_C <- rast("SOIL CARBON/TESTCrypticCarbon1M_LMEnonlog10.tif")
+soil_C <- rast("SOIL CARBON/CrypticCarbonMaps/CrypticCarbon1M_LMEsqrt^2_NEWGEO_2_15.tif")
 #upl_soil_C <- rast("SOIL CARBON/hohC_mask0_uplMg.tif")
 wet_soil_C <- rast("SOIL CARBON/CrypticCarbonMaps/CC_1M_WET.tif")
 bet_soil_C <- rast("SOIL CARBON/CrypticCarbonMaps/CC_C_mask0_betweenMg-AnthonyMBP.tif")

@@ -6,66 +6,94 @@ library(tidyterra)
 
 setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/')
 hoh_poly <- vect('SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/HOH_POLYGON_7_11_2022/HOH_POLYGON_711.shp')
-
+# 
 wa_250 <- sf::st_read("SOIL CARBON/SPATIAL LAYERS/WA_GEO/ger_portal_surface_geology_250k/WGS_Surface_Geology_250k.gdb",
                       layer = "MapUnitPolys")
-wa_250t <- vect(wa_250)
-wa_250tproj <- terra::project(wa_250t, "EPSG:26910")
-hoh_250 <- crop(wa_250tproj, hoh_poly)
-plot(hoh_250, "MapUnit")
-hoh_250_reclass <- hoh_250 |> tidyterra::mutate(MapUnit = case_when(MapUnit == "Qad_NW" ~ "Quat_old_clastic",
-                                                         MapUnit == "Qao_NW" ~ "Quat_old_alluv",
-                                                         MapUnit == "Qapo_NW" ~ "Quat_old_clastic",
-                                                         MapUnit == "Qapw(2)" ~ "Quat_old_clastic",
-                                                         MapUnit == "Qguc" ~ "Quat_old_clastic",
-                                                         MapUnit == "Qa_NW" ~ "Quat_new",
-                                                         MapUnit == "Qls_NW" ~ "Quat_new",
-                                                         MapUnit == "wtr_NW" ~ "Quat_new", 
-                                                         MapUnit == "MEm" ~ "MioEo",
-                                                         MapUnit == "MEmst" ~ "MioEo",
-                                                         TRUE ~ "MioEo")) 
-#hoh_250_reclass_tif <- rasterize(hoh_250_reclass, GEOm, field = "MapUnit", filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.tif")
-writeRaster(hoh_250_reclass, "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.")
-wa_geology <- vect("SPATIAL LAYERS/WA_GEO/WA_geologic_unit_poly_100k.shp")
-hoh_geology <- vect('SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_GEO_CLIP_7_22.shp')
-plot(hoh_geology, "GEOLOGIC_A")
-col_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/colville_nwi_poly.shp")
-plot(col_poly)
+# wa_250t <- vect(wa_250)
+# wa_250tproj <- terra::project(wa_250t, "EPSG:26910")
+# hoh_250 <- crop(wa_250tproj, hoh_poly)
+# plot(hoh_250, "MapUnit")
+# hoh_250_reclass <- hoh_250 |> tidyterra::mutate(MapUnit = case_when(MapUnit == "Qapw(2)" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qguc" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qapo_NW" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qad_NW" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qapw(1)" ~ "Quat_old_clastic",
+#                                                          MapUnit == "Qap_NW" ~ "Quat_old_clastic",
+#                                                          
+#                                                          MapUnit == "Qao_NW" ~ "Quat_old_alluv",
+#                                                          MapUnit == "Qa_NW" ~ "Quat_new",
+#                                                          MapUnit == "Qls_NW" ~ "Quat_new",
+#                                                          MapUnit == "wtr_NW" ~ "Quat_new", 
+#                                                          
+#                                                          MapUnit == "MEm" ~ "MioEo",
+#                                                          MapUnit == "MEmst" ~ "MioEo",
+#                                                          TRUE ~ "MioEo")) 
+# plot(hoh_250_reclass, "MapUnit")
+# 
+# GEOm <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassMask.tif")
+# hoh_250_reclass_tif <- rasterize(hoh_250_reclass, GEOm, field = "MapUnit", 
+#                                  filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.tif",
+#                                  overwrite = T)
+#writeRaster(hoh_250_reclass, "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassified.tif")
 
 
-wa_geo_proj<- terra::project(wa_geology, "EPSG:26910")
+wa_100 <- sf::st_read("SOIL CARBON/SPATIAL LAYERS/WA_GEO/WA_geologic_unit_poly_100k.shp")
+wa_100t <- vect(wa_100)
+wa_100tproj <- terra::project(wa_100t, "EPSG:26910")
+hoh_100 <- crop(wa_100tproj, hoh_poly)
+plot(hoh_100, "LITHOLOGY")
+hoh_litho <- terra::subset(hoh_100, hoh_100$LITHOLOGY =="continental glacial and non-glacial deposits, Fraser-age")
 
-hoh_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_R_GEO_CROP.gpkg")#crop(wa_geo_proj, hoh_poly)
-#writeVector(hoh_geo_crop, "SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_R_GEO_CROP.gpkg")
-plot(hoh_geo_crop, "GEOLOGIC_A", add = F)
+
+hoh_100_reclass <- hoh_100 |> tidyterra::mutate(LITHOLOGY = case_when(LITHOLOGY == "alpine glacial drift, pre-Fraser"   ~ "glac_drift",
+                                                                      LITHOLOGY == "alpine glacial drift, pre-Wisconsinan, older" ~ "glac_drift",
+                                                                      LITHOLOGY == "alpine glacial drift, Fraser-age" ~ "glac_drift",
+                                                                      LITHOLOGY == "alpine glacial drift, pre-Wisconsinan, younger"  ~ "glac_drift",
+                                                                     
+                                                                       LITHOLOGY == "alpine glacial till, pre-Wisconsinan"  ~ "till_outwash",
+                                                                      LITHOLOGY == "alpine glacial outwash, pre-Fraser"  ~ "till_outwash",
+                                                                      LITHOLOGY == "alpine glacial till, Fraser-age" ~ "till_outwash",
+                                                                      LITHOLOGY == "glacial outwash, alpine, Fraser-age"  ~ "till_outwash",
+                                                                    LITHOLOGY == "alpine glacial till, pre-Fraser" ~ "till_outwash",
+                                                                    LITHOLOGY == "alpine glacial outwash, pre-Wisconsinan" ~ "till_outwash",
+                                                                    
+                                                                    
+                                                                    LITHOLOGY == "alluvium"  ~ "alluvium_marine_water",
+                                                                    LITHOLOGY == "water" ~ "alluvium_marine_water",
+                                                                    
+                                                                    LITHOLOGY == "tectonic breccia"  ~ "MioEo",
+                                                                    LITHOLOGY ==  "marine clastic rocks, dominantly thick-bedded lithic sandstone" ~ "MioEo",
+                                                                    LITHOLOGY == "continental glacial and non-glacial deposits, Fraser-age"  ~ "MioEo",
+                                                                    LITHOLOGY == "marine sedimentary rocks"  ~ "MioEo",
+                                                                    LITHOLOGY == "mass-wasting deposits, mostly landslides" ~ "MioEo",
+                                                                    TRUE ~ "MioEo")) 
+plot(hoh_100_reclass, "LITHOLOGY")
+writeVector(hoh_100_reclass, "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/hoh_100_reclass_lithology.shp")
+
+GEOm <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_100k_reclassified.tif")
+WIPm <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_Mask0_10_2022.tif")
+hoh_100_reclass_tif <- rasterize(hoh_100_reclass, GEOm, field = "LITHOLOGY", 
+                                 filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_100k_reclassified.tif",
+                                 overwrite = T)
 
 
 #Bring in points to visualize where they land
-pts <- read.csv("SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
-pts_vect <- vect(pts, geom = c("x", "y"))
-set.crs(pts_vect, "EPSG:26910")
-#pts_vect <- terra::project(pts_vect, "EPSG:26910")
-#hoh_pts_vect <- pts_vect[pts_vect$STUDY_AREA =="HOH"]
-#writeVector(hoh_pts_vect, filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_sample_points.shp", overwrite = T)
-#plot(pts_vect, add = T)
-# e <- c(405000,410000,529500, 530000)
-# zoom(hoh_geo_crop, "GEOLOGIC_A", e = e)
-# points(pts_vect)
-pts_extract <- extract(hoh_250_reclass, pts_vect)
-# pts_extract <- pts_extract |> mutate(MapUnit = case_when(MapUnit == "Qad_NW" ~ "Quat_old_clastic",
-#                                                          MapUnit == "Qao_NW" ~ "Quat_old_alluv",
-#                                                          #MapUnit == "Qapo_NW" ~ "Quat_old_clastic",
-#                                                          MapUnit == "Qapw(2)" ~ "Quat_old_clastic",
-#                                                          #MapUnit == "Qguc" ~ "Quat_old_clastic",
-#                                                          MapUnit == "Qa_NW" ~ "Quat_new",
-#                                                          #MapUnit == "Qls_NW" ~ "Quat_new",
-#                                                          #MapUnit == "wtr_NW" ~ "Quat_new", 
-#                                                          MapUnit == "MEm" ~ "MioEo",
-#                                                          MapUnit == "MEmst" ~ "MioEo")) 
-hoh_csv <- read.csv("SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
-hoh_csv$GEO_250 <- pts_extract$MapUnit
-write.csv(hoh_csv, file = "SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
-unique(hoh_csv$GEO_250)
+pts <- read.csv("SOIL CARBON/ANALYSIS/CrypticCarbon_Jlat_lith.csv")
+pts_vect <- vect(pts, geom = c("jlon", "jlat"))
+#set.crs(pts_vect, "EPSG:4326")
+pts_vect <- terra::project(pts_vect, "EPSG:26910")
+plot(pts_vect, add = T)
+pts_vect_extr <- terra::extract(hoh_100_reclass, pts_vect)
+pts_vect_WIPextr <- terra::extract(WIPm, pts_vect, method = "bilinear")
+#pts_vect_extr<- cbind(pts_vect, pts_vect_extr)
+pts_vect$LITHOLOGY <- pts_vect_extr$LITHOLOGY
+pts_vect$jlat <- pts$jlat
+pts_vect$jlon <- pts$jlon
+pts_vect$WIPv8 <- pts_vect_WIPextr$WET
+#writeVector(pts_vect, filename = "SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/CrypticCarbon_Jlat_lith.shp", overwrite = T)
+write.csv(pts_vect, file = "SOIL CARBON/ANALYSIS/CrypticCarbon_Jlat_lithextract.csv")
+
+
 
 # #####rename all Miocene in Hoh to Miocene-Eocene and Present to Holocen-Quaternary####
 # hoh_geo_crop$GEOLOGIC_A[hoh_geo_crop$GEOLOGIC_A == "Miocene"] <- "Miocene-Eocene"
@@ -85,8 +113,8 @@ unique(hoh_csv$GEO_250)
 #Other Study areas
 
 #get shapefile
-#col_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_poly.shp")
-mas_poly <- vect("SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_poly/mashel_poly.shp")
+col_poly <- vect("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/COL/COL_poly.shp")
+mas_poly <- vect("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/MAS/MAS_poly/mashel_poly.shp")
 mas<- read.csv("ANALYSIS/MAS_SOILC_7_11_22_samp.csv")
 mas_points <- vect(mas, geom = c("lon", "lat"))
 set.crs(mas_points, "EPSG:4326")
@@ -96,13 +124,14 @@ mas_poly_proj <- terra::project(mas_poly, "EPSG:26910")
 mas_points_proj <- terra::project(mas_points, "EPSG:26910")
 
 #crop wa geo then read in written file
-hoh_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_R_GEO_CROP.gpkg")
-col_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/COL_R_GEO_CROP.gpkg")#crop(wa_geo_proj, col_poly_proj)
-mas_geo_crop <- vect("SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/MAS_R_GEO_CROP.gpkg")#crop(wa_geo_proj, mas_poly_proj)
+hoh_geo_crop <- vect("SOIL CARBON/SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/HOH_R_GEO_CROP.gpkg")
+col_geo_crop <- vect("SOIL CARBON/SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/COL_R_GEO_CROP.gpkg")
+col_geo_crop <- crop(wa_geo_proj, col_poly_proj)
+mas_geo_crop <- vect("SOIL CARBON/SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/MAS_R_GEO_CROP.gpkg")#crop(wa_geo_proj, mas_poly_proj)
 #writeVector(mas_geo_crop,  "SPATIAL LAYERS/WA_GEO/GEO_STUDY_AREAS/MAS_R_GEO_CROP.gpkg")
 plot(hoh_geo_crop, "GEOLOGIC_A")
-plot(col_geo_crop, "GEOLOGIC_A")
-plot(mas_geo_crop, "GEOLOGIC_U")
+plot(col_geo_crop, "LITHOLOGY")
+plot(mas_geo_crop, "LITHOLOGY")
 plot(mas_points_proj, add = T)
 #all of the geologic ages in all study areas
 h <- hoh_geo_crop$GEOLOGIC_A #"Miocene-Eocene"      "Holocene-Quaternary" "Pleistocene"  

@@ -2,12 +2,13 @@ library(lme4)
 library(lmerTest)
 library(terra)
 library(sp)
-library(dplyr)
+library(tidyverse)
+library(car)
 library(ggplot2)
+#library(ggpubr)
 library(merTools)
 library(glmnet)
 library(stats)
-library(MASS)
 library(ggcorrplot)
 library(RColorBrewer)
 library(cowplot)
@@ -56,12 +57,13 @@ carbonMean <- mean(hoh_dat$CARBON_1M)
 carbonSD <- sd(hoh_dat$CARBON_1M)
 
 hoh_dat_norm <- hoh_dat
-hoh_dat_norm[ , -c(1:4,11, 28)] <- scale(x       = hoh_dat_norm[ , -c(1:4, 11,28)],
+hoh_dat_norm[ , -c(1:6,13,30)] <- scale(x       = hoh_dat_norm[ , -c(1:6, 13, 30)],
                                       center  = TRUE,
                                       scale   = TRUE)
+summarise_all(hoh_dat_norm, mean)
 
-############## Recoding GEO ##########################################
-hoh_dat<- hoh_dat  |> mutate(landtype = case_when(WIP >= 0.5 &GEO == "Quat_new" ~ "RIVERINE",
+############## Recoding GEO to landtype  ##########################################
+hoh_dat_norm<- hoh_dat_norm  |> mutate(landtype = case_when(WIP >= 0.5 &GEO == "Quat_new" ~ "RIVERINE",
                                                   WIP >= 0.5 &GEO != "Quat_new" ~ "NON RIV WETLAND",
                                                   WIP < 0.5 &WIP>0.1 &GEO != "Quat_new" ~ "MESIC",
                                                   WIP < 0.5 &WIP>0.1 &GEO == "Quat_new" ~ "MESIC",
@@ -111,9 +113,9 @@ lasso <- function(df){
 ############## Statistical Models ###########################################################
 
 ###### Doing LASSO regression to identify variables##############
-lasshoh <- lasso(hoh_dat) # for hoh
+lasshoh <- lasso(hoh_dat_norm) # for hoh
 
-hoh_mat <- round(cor(hoh_dat[, c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM",
+hoh_mat <- round(cor(hoh_dat_norm[, c("CARBON_1M", 
                            "WIP", "DEM","DTW","PRECIP","SLP","TWI",
                            "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
                            "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
@@ -129,15 +131,14 @@ gcp <- ggcorrplot(hoh_mat, hc.order = F, ggtheme = ggplot2::theme_gray, type = "
 # Taking the coefs from the LASSO results?
 
 ####Big model for backwards step##################
-big_mod <- lmer(log10(CARBON_1M) ~  WIP+log10(DEM)+log10(DTW)+ log10(PRECIP)+SLP+TWI+
+big_mod <- lmer(sqrt(CARBON_1M) ~  WIP+(DEM)+(DTW)+ (PRECIP)+SLP+TWI+
                 NDVI_win+MNDWI_win+ EVI_win+ TempK_win+
                 NDVI_spr+ MNDWI_spr+ EVI_spr+ TempK_spr+
                 NDVI_sum+  EVI_sum+ TempK_sum+
                 NDVI_aut+  MNDWI_aut+ EVI_aut+ TempK_aut  +
                 b2_s_1_spr + b3_s_2_sum + b1_s_1_spr + b5_s_2_sum + b5_s_3_aut +
-                 b8_s_2_sum + (1|GEO), data = hoh_dat)
-big_mod2 <- lmer(log10(CARBON_FULL) ~ WIP + MNDWI_sum +  
-                 EVI_sum + GEO + (1|GEO), data = hoh_dat, REML = F)
+                 b8_s_2_sum + (1|GEO), data = hoh_dat_norm)
+big_mod2 <- lmer(sqrt(CARBON_1M) ~ WIP +  b2_s_1_spr + b3_s_2_sum + b5_s_3_aut + (1 | GEO), data = hoh_dat_norm, REML = F)
 
 #(step_res <- MASS::stepAIC(big_mod))
 #step(mod, scope=list(lower=Adjusted.score ~ original.score, upper=mod))
@@ -146,41 +147,51 @@ big_mod2 <- lmer(log10(CARBON_FULL) ~ WIP + MNDWI_sum +
                          reduce.random=FALSE))
 #stepB <- stats::step(big_mod)
 final <- get_model(stepA)
+plot(final)
 # final <- lmer(log10(CARBON_FULL) ~ (PRECIP)  + (1 | GEO), data = hoh_dat, REML = T)
 model_summ <- summary(final)
 mean(model_summ$residuals^2)
 
 #Testing different models section ####
 #test <-  lmer(log10(CARBON_FULL) ~ WIP + (1|GEO), data = hoh_dat, REML = F)
-test <-  lmer(log10(CARBON_1M) ~ WIP + (1|GEO), data = hoh_dat_norm, REML = F)
+test <-  lmer(sqrt(CARBON_1M) ~   WIP|GEO, data = hoh_dat_norm)
+
+shapiro.test(sqrt(hoh_dat_norm$CARBON_1M) )
+plot(cooks.distance(test))
 summary(test)
 anova(test)
 tab_model(test)
-sqrt(mean(resid(test)^2))
-#lm(log10(CARBON_1M) ~ WIP + MNDWI_sum + EVI_sum + GEO, 
-#                       data = hoh_dat, 
-#                       REML = F);summary(test)
+plot(test)
+qqPlot(resid(test))
+#qqline(resid(test))
 
-r.sq(log10(hoh_dat$CARBON_1M), fitted(test))
-lm(log10(hoh_dat$CARBON_1M) ~ fitted(test))
-mean(log10(hoh_dat$CARBON_1M) - predict(test))
+sqrt(mean(resid(test)^2))
+RMSE.merMod(test)
+rmse(test)
+
+
+
+r.sq(sqrt(hoh_dat_norm$CARBON_1M), fitted(test))
+
+lm(log10(hoh_dat_norm$CARBON_1M) ~ fitted(test))
+#mean(sqrt(hoh_dat_norm$CARBON_1M) - predict(test))
 
 
 ############## Examining covariates ############################
-plot((hoh_dat$MNDWI_sum ~ hoh_dat$CARBON_1M))
-abline(lm(hoh_dat$MNDWI_sum ~ hoh_dat$CARBON_1M))
-summary(lm(hoh_dat$MNDWI_sum ~ hoh_dat$CARBON_1M)) # I don't like the maps of these, too many artifacts
-summary(lm(hoh_dat$WIP~ hoh_dat$CARBON_1M))
-plot(WIP ~ CARBON_1M, data = hoh_dat)
-abline(lm(WIP ~ CARBON_1M, data = hoh_dat))
+plot((hoh_dat$TWI ~ sqrt(hoh_dat$CARBON_1M)))
+abline(lm(hoh_dat$TWI ~ sqrt(hoh_dat$CARBON_1M)))
+summary(lm(hoh_dat$TWI ~ sqrt(hoh_dat$CARBON_1M))) # I don't like the maps of these, too many artifacts
+summary(lm(hoh_dat$WIP ~ hoh_dat$TWI))
+plot(WIP ~ sqrt(hoh_dat$CARBON_1M), data = hoh_dat)
+abline(lm(WIP ~ sqrt(hoh_dat$CARBON_1M), data = hoh_dat))
 
 sjPlot::tab_model(test)
 
 ############# Model Figures and Graphs ##########################################
 
 #### LMER specific graph ####
-ggplot(hoh_dat, aes(x = WIP, 
-       y = log10(CARBON_1M), 
+ggplot(hoh_dat_norm, aes(x = WIP, 
+       y = sqrt(CARBON_1M), 
        colour =  GEO,
        shape = as.factor(WIP >= 0.5))) +
     geom_point(aes(size = 3, stroke = 2)) +
@@ -189,7 +200,7 @@ ggplot(hoh_dat, aes(x = WIP,
                        labels= c("Miocene/\nEocene", "Quaterary\nRiverine", "Quaterary\nAlluvium", "Quaternary\nClastic"))+#c("MioceneEocene", "QuaternaryRiverine", "QuaternaryAlluvium", "QuaternaryClastic")) +
     scale_shape_manual(values = c(16, 2), name = NULL, labels = c("Upland", "Wetland")) + 
     ggplot2::scale_size(name = NULL, breaks = NULL, labels = NULL) +
-    xlab("WIP Wetland Probability") + ylab('Log10 Predicted Soil C (Mg/ha)') +
+    xlab("WIP Wetland Probability") + ylab('Square Root Predicted Soil C (MgC/ha)') +
     #scale_color_manual(labels = c("Riverine", "Non-Riverine"), values = c("blue", "red")) +
     #labs(colour = "Random Effect") +
     theme(legend.position = 'right', 
@@ -199,35 +210,37 @@ ggplot(hoh_dat, aes(x = WIP,
           text = element_text(size = 20))
 
 ##### Fit of Predicted vs. Actual ####
-ggplot(hoh_dat) +
-    geom_point(aes(y = (fitted(test)), x = log10(CARBON_1M), 
-                   colour =  as.factor(landtype_no_mes), shape = as.factor(WIP >= 0.5), size = 3, stroke = 2)) +
-    # scale_color_manual(name = "Landscape Class", values=c( '#E69F00','#96E072', '#56B4E9', '#C1666B'),
-    #                    labels= c("MESIC\n","NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND"))+#c("MioceneEocene", "QuaternaryRiverine", "QuaternaryAlluvium", "QuaternaryClastic")) +
-    scale_color_manual(name = "Landscape\nClass", values=c( '#96E072', '#56B4E9', '#C1666B'),
-                       labels= c("NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND"))+#c("MioceneEocene", "QuaternaryRiverine", "QuaternaryAlluvium", "QuaternaryClastic")) +
+ggplot(hoh_dat_norm) +
+    geom_point(aes(y = (fitted(test)), x = sqrt(CARBON_1M), 
+                   colour =  landtype, 
+                   shape = as.factor(WIP >= 0.5), size = 3, stroke = 2)) +
+    scale_color_manual(name = "Landscape Class", values=c( '#E69F00','#96E072', '#56B4E9', '#C1666B'),
+                        labels= c("MESIC\n","NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND"))+#c("MioceneEocene", "QuaternaryRiverine", "QuaternaryAlluvium", "QuaternaryClastic")) +
+    # scale_color_manual(name = "Landscape\nClass", values=c( '#96E072', '#56B4E9', '#C1666B'),
+    #                   labels= c("NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND"))+#c("MioceneEocene", "QuaternaryRiverine", "QuaternaryAlluvium", "QuaternaryClastic")) +
     scale_shape_manual(values = c(16, 2), name = "WIP Above/\nBelow \n0.50", labels = c("Upland", "Wetland")) + 
     ggplot2::scale_size(name = NULL, breaks = NULL, labels = NULL) +
-    xlab("Log10 Actual Soil C (Mg/ha)") + ylab('Log10 Predicted Soil C (Mg/ha)') +
-    geom_smooth(aes(y = fitted(test), x = log10(CARBON_1M)), method = "lm", se = TRUE) +
+    xlab('Square Root Actual Soil C (MgC/ha)') + ylab('Square Root Predicted Soil C (MgC/ha)') +
+    geom_smooth(aes(y = fitted(test), x = sqrt(CARBON_1M)), method = "lm", se = TRUE) +
     geom_abline(intercept = 0, slope = 1, linewidth = 0.5, linetype = "dashed") +
     #scale_color_manual(labels = c("Riverine", "Non-Riverine"), values = c("blue", "red")) +
     labs(colour = "Random Effect") +
-    xlim(1.4, 3) +
-    ylim(1.4, 3)  +
-    theme(legend.position = 'right', 
+    #xlim(1.4, 3) +
+    #ylim(1.4, 3)  +
+    theme(legend.position = "none", 
           panel.background = element_blank(),
           panel.grid.major = element_line(colour = "grey80"),
           axis.ticks = element_blank(),
           text = element_text(size = 20))
 #### Histogram ####
-ggplot(hoh_dat, aes(x = CARBON_1M)) +
+ggplot(hoh_dat_norm, aes(x = sqrt(CARBON_1M), 
+                    fill = as.factor(landtype))) +
     geom_histogram(position = "stack", bins = 30) + 
-    # scale_fill_manual(values=c( '#E69F00','#96E072', '#56B4E9', '#C1666B'),
-    #                    labels= c("MESIC\n","NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND")) +
-    scale_fill_manual(values=c('#96E072', '#56B4E9', '#C1666B'),
-                      labels= c("NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND")) +
-    xlab("Soil C (Mg/ha)") +
+    scale_fill_manual(values=c( '#E69F00','#96E072', '#56B4E9', '#C1666B'),
+                       labels= c("MESIC\n","NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND")) +
+    # scale_fill_manual(values=c('#96E072', '#56B4E9', '#C1666B'),
+    #                   labels= c("NON RIV\nWETLAND", "\nRIVERINE", "\nUPLAND")) +
+    xlab("Square Root Soil C (MgC/ha)") +
     theme(legend.position = 'right', 
           panel.background = element_blank(),
           panel.grid.major = element_line(colour = "grey80"),
@@ -246,7 +259,7 @@ ggplot(hoh_dat, aes(x = CARBON_1M)) +
 # grouping variables
 data_summary <- function(data, varnames, groupnames){
     require(dplyr)
-    require(plyr)
+    #require(plyr)
     summary_func <- function(x, col){
         c(mean_ = mean(x[[col]], na.rm=TRUE),
           sd_ = sd(x[[col]], na.rm=TRUE),
@@ -273,12 +286,12 @@ data_summary <- function(data, varnames, groupnames){
     #rownames(cmb) <- nms
     return(as.data.frame(cmb))
 }
-hoh_bar <- data_summary(hoh_dat, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype_no_mes")
-hoh_mesbar <- data_summary(hoh_dat, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype")
-hoh_wubar <- data_summary(hoh_dat, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype_wetup")
+hoh_bar <- data_summary(hoh_dat_norm, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype_no_mes")
+hoh_mesbar <- data_summary(hoh_dat_norm, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype")
+hoh_wubar <- data_summary(hoh_dat_norm, varnames = c("CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM", "CARBON_FULL"), groupnames = "landtype_wetup")
 
 
-hoh_bar_t <- t(hoh_bar[,2:10])
+hoh_bar_t <- t(hoh_bar[,1:length(hoh_bar)])
 
 ggplot(hoh_bar, aes(x = landtype_no_mes)) +
     geom_bar()
@@ -429,7 +442,7 @@ glmer30CM <- Model_Fun("glmer", "30CM", hoh_dat)
 set.seed(7)
 PI <- predictInterval(
     test,
-    hoh_dat,
+    hoh_dat_norm,
     which = c("full"),
     level = 0.95,
     n.sims = 1000,
@@ -460,20 +473,24 @@ PIwet <- predictInterval(
     ignore.fixed.terms = NULL
 )
 
-ggplot(aes(x=1:36, y=fit, ymin=lwr, ymax=upr), data=PI[1:36,]) +
+ggplot(aes(x=sqrt(hoh_dat_norm$CARBON_1M), y=fit, ymin=lwr, ymax=upr), dat = PI) +
     geom_point() +
     geom_linerange() +
+    geom_smooth(aes(y = fitted(test), x = sqrt(hoh_dat_norm$CARBON_1M)), method = "lm", se = F) + 
     labs(x="Index", y="Prediction w/ 95% PI") + theme_bw()
 
+fastdisp(test)
+lattice::dotplot(ci)
+
 PI_conf <- predictInterval(test, hoh_dat[1,], include.resid.var = 0)
-newdata <- data.frame(WIP = 0.5, EVI_sum = 0.5, MNDWI_sum = 0.5, GEO = "Pleistocene")
+newdata <- data.frame(WIP = 0.5, GEO = "Quat_old_clastic")
 
 confint.merMod(test, level = 0.95, method = "boot", nsim = 500, oldNames = F)
-confint(test, method = "boot")
+ci <- confint(test, method = "boot")
 
 #trying predict
 
-predict(lmerFULL, newdata, interval = "confidence", level = 0.95)
+predict(test, newdata, interval = "confidence", level = 0.95)
 
 
 hoh_dat$upr <- PI$upr[1:36]
@@ -489,8 +506,9 @@ lwr_mod <- lm(lwr ~ log10(CARBON_FULL) , data = hoh_dat)
 WIPm <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_Mask0_10_2022.tif")#mask(WIP, (MNDWI_sum>-0.30),  maskvalues = 1, updatevalue = NA) #need to write to raster
 #writeRaster(WIPm, filename = "SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_Mask0_10_2022.tif")
 GEOm <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassMask.tif")
-MNDWI_sum_m <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_MNDWIsum_Mask0_10_2022.tif")
-EVI_sum_m <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_EVIsum_Mask0_10_2022.tif")
+GEO2 <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/GEO_resample_z10_R.tif")
+#MNDWI_sum_m <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_MNDWIsum_Mask0_10_2022.tif")
+#EVI_sum_m <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_EVIsum_Mask0_10_2022.tif")
 #DTW <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/MainChannelDTW_m0.tif")
 #DTW_RIV <- DTW >50#rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/MainChannelDTW_RIV_m0.tif")
 #points <- vect(hoh_csv, geom = c("x", "y"), crs = "EPSG:26910")
@@ -499,7 +517,7 @@ EVI_sum_m <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_EVI
 #write.csv(hoh_csv, file = "SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
 
 ############## A histogram of maps ##########################################
-hist_wip <- hist(WIPm, breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1), na.rm = T)
+hist_wip <- hist(WIPm, breaks = c(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1), maxcell = 100000000)
 dat <- data.frame(counts= hist_wip$counts,breaks = hist_wip$mids)
 ggplot(dat, aes(x = breaks, y = counts, fill =counts)) +
     geom_bar(stat = "identity") + 
@@ -518,12 +536,13 @@ ggplot(dat, aes(x = breaks, y = counts, fill =counts)) +
 plot(GEOm, col = c("#A3333D", "#291F1E", "#477998", "#9C9CDB"))
 
 ############## Predicting model to raster map ########################################################
-rs <- c(WIPm, MNDWI_sum_m, EVI_sum_m,GEOm)
-names(rs) <- c("WIP", "MNDWI_sum","EVI_sum", "GEO")
+rs <- c(WIPm , GEOm)
+names(rs) <- c("WIP", "GEO")
 #test$xlevels <- union(test$xlevels, levels(GEOm$GEOLOGIC_A))
-Pred <- terra::predict(rs, lmer1M, allow.new.levels = T)
-Pred_nl <- (10^Pred)
-writeRaster(Pred_nl, filename = "SOIL CARBON/CrypticCarbon1M_LMEnonlog10_NEWGEO.tif")
+Pred <- terra::predict(rs, test, allow.new.levels = T)
+Pred_nl <- (Pred**2)
+plot(Pred_nl)
+writeRaster(Pred_nl, filename = "SOIL CARBON/CrypticCarbonMaps/CrypticCarbon1M_LMEsqrt^2_NEWGEO_2_15.tif", overwrite = T  )
 
 
 

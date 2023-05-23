@@ -32,3 +32,24 @@ confusionMatrix(WIP_valpts_df$MH_Class, WIP_valpts_df$wip_8_04_.65class)
 r_curve <- roc(response = as.ordered(WIP_valpts_df$MH_Class),
                predictor = as.ordered(WIP_valpts_df$wip_8_04_.5class), percent = T)
 
+
+
+#### WIP wetlands characteristics) ####
+WET <- mask(WIP, (WIP>=0.5), maskvalues = 0, updatevalue = NA,  filename = "WIP/WIP_WET.tif", overwrite =T)
+plot(WET)
+
+WETpts <- terra::spatSample(WET$WET, size = 1000, as.points = T, na.rm = T)
+plot(WETpts)
+
+#stack to extract 
+agb <- rast("AGB/HOH/Hudak_AGB_WIPrspl.tif")
+rast("WIP/Hoh_data/TopoIndices/dev_1000.tif")
+filelist_temp <- list.files("WIP/Hoh_data/TopoIndices/", pattern = ".tif$")
+
+
+
+
+h <- rast("Teal_Carbon - WIP/WIPmaps/Hoh_model_fullextent_v1_raster.tif")
+plot(h)
+plot(WIP)
+

@@ -11,46 +11,37 @@ library(MASS)
 
 setwd('/Users/Anthony/OneDrive - UW/University of Washington/Data and Modeling/')
 
-hoh_csv <- read.csv("SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
+hoh_csv <- read.csv("SOIL CARBON/ANALYSIS/CrypticCarbon_Jlat_lithextract.csv")
+#write_csv(hoh_csv, file = "SOIL CARBON/ANALYSIS/hoh_CHN_1m30cm_Stocks_WIPupd.csv")
+#vect(hoh_csv, geom = c('x', 'y'))
+
+
 
 ################################################################################
 ################################### PRZ ADDED ##################################
 ################################################################################
 # LOADING TIDYVERSE PACKAGE
 library(tidyverse)
+
 #subset for easier viewing and access
-hoh_dat <- as_tibble(hoh_csv) %>% dplyr::select(sample_name,
-                                                CHN_Cstock_Mg_ha, CHN_1m_Cstock_Mg_ha, CHN_30m_Cstock_Mg_ha,
-                                                WIP_NEW, DEM,DTW, PRECIP,SLP,TWI, DTW_RIV,
-                                                NDVI_s_0_win,MNDWI_s_0_win, EVI_s_0_win, b10_s_0_win,
-                                                NDVI_s_1_spr, MNDWI_s_1_spr, EVI_s_1_spr, b10_s_1_spr,
-                                                NDVI_s_2_sum,  MNDWI_s_2_sum, EVI_s_2_sum, b10_s_2_sum,
-                                                NDVI_s_3_aut,  MNDWI_s_3_aut, EVI_s_3_aut, b10_s_3_aut, 
-                                                GEO_250, b2_s_1_spr, b3_s_2_sum, b1_s_1_spr,  
-                                                b5_s_2_sum, b5_s_3_aut, b8_s_2_sum, DTW_RIV) %>%
-    #mutate(GEO_8_6_22 =  replace(GEO_8_6_22, GEO_8_6_22 == "Quaternary", "Holocene-Quaternary-Present")) %>%
+hoh_dat <- as_tibble(hoh_csv) %>% dplyr::select(sample_name, CHN_Cstock_Mg_ha, CHN_1m_Cstock_Mg_ha, 
+                                                CHN_30m_Cstock_Mg_ha, CHN_90m_Cstock_Mg_ha, CHN_120m_Cstock_Mg_ha,
+                                                LITHOLOGY, WIPv8, jlat, jlon ) %>%
     mutate_if(is.character, as.factor) %>%
-    mutate_at(c("DTW_RIV"), as.factor) %>%
-    stats::setNames(c("NAME", "CARBON_FULL", "CARBON_1M", "CARBON_30CM",
-                      "WIP", "DEM","DTW","PRECIP","SLP","TWI", "DTW_RIV",
-                      "NDVI_win","MNDWI_win", "EVI_win", "TempK_win",
-                      "NDVI_spr", "MNDWI_spr", "EVI_spr", "TempK_spr",
-                      "NDVI_sum",  "MNDWI_sum", "EVI_sum", "TempK_sum",
-                      "NDVI_aut",  "MNDWI_aut", "EVI_aut", "TempK_aut", "GEO",
-                      "b2_s_1_spr", "b3_s_2_sum", "b1_s_1_spr",  "b5_s_2_sum", 
-                      "b5_s_3_aut", "b8_s_2_sum", "DTW_RIV")) %>% 
+    stats::setNames(c("NAME", "CARBON_FULL", "CARBON_1M", "CARBON_30CM", "CARBON_90CM", "CARBON_120CM",
+                      "LITHOL", "WIP", "jlat", "jlon")) %>% 
     as.data.frame()
 str(hoh_dat)
 
 # GEOLOGY-specific datasets and models (just doing GLM)
-hoh_Qo <- hoh_dat %>% filter(GEO == "Quat_old_clastic")
-hoh_Qn <- hoh_dat %>% filter(GEO == "Quat_new")
-hoh_Qa <- hoh_dat %>% filter(GEO == "Quat_old_alluv")
-hoh_ME <- hoh_dat %>% filter(GEO == "MioEo")
+hoh_Qo <- hoh_dat %>% filter(LITHOL == "alluvium_marine_water")
+hoh_Qn <- hoh_dat %>% filter(LITHOL == "glac_drift")
+hoh_Qa <- hoh_dat %>% filter(LITHOL == "till_outwash")
+hoh_ME <- hoh_dat %>% filter(LITHOL == "MioEo")
 
 # HISTOGRAMS OF NUMERIC VARIABLES BY GEOLOGY
 plotCARBON <- ggplot( data    = hoh_dat,
-                      mapping = aes(x = CARBON_1M, fill = GEO)) +
+                      mapping = aes(x = CARBON_1M, fill = LITHOL)) +
   geom_histogram(position = "dodge", bins = 36, binwidth = 50) +
   labs( title         = "Histogram of CARBON by GEOLOGY") +
   theme(plot.title    = element_text(hjust = 0.5), 
@@ -58,7 +49,7 @@ plotCARBON <- ggplot( data    = hoh_dat,
   xlim(0, 800)
 
 plotWETLAND <- ggplot(data    = hoh_dat,
-                      mapping = aes(x = WIP, fill = GEO)) +
+                      mapping = aes(x = WIP, fill = LITHOL)) +
   geom_histogram(position = "dodge", bins = 36) +
   labs( title         = "Histogram of WETLAND by GEOLOGY") +
   theme(plot.title    = element_text(hjust = 0.5), 
@@ -66,7 +57,7 @@ plotWETLAND <- ggplot(data    = hoh_dat,
   xlim(0, 1)
 
 plotMNDWI <- ggplot(data    = hoh_dat,
-                    mapping = aes(x = MNDWI_sum, fill = GEO)) +
+                    mapping = aes(x = MNDWI_sum, fill = LITHOL)) +
   geom_histogram(position = "dodge", bins = 36, binwidth = 50) +
   labs( title         = "Histogram of MNDWI by GEOLOGY") +
   theme(plot.title    = element_text(hjust = 0.5), 
@@ -74,7 +65,7 @@ plotMNDWI <- ggplot(data    = hoh_dat,
   xlim(-0.75, -0.25)
 
 plotEVI <- ggplot(data    = hoh_dat,
-                    mapping = aes(x = EVI_sum, fill = GEO)) +
+                    mapping = aes(x = EVI_sum, fill = LITHOL)) +
     geom_histogram(position = "dodge", bins = 36, binwidth = 50) +
     labs( title         = "Histogram of MNDWI by GEOLOGY") +
     theme(plot.title    = element_text(hjust = 0.5), 
@@ -111,13 +102,13 @@ kFoldCV <- function(K = 6, reps = 10, randSeed = 11){
       dataTrain <- hoh_dat[-rowsTest,] # data that is outside the fold
       
       # Run model on K-1 folds (training data)
-      mod_kFold <- lmer(formula = log10(CARBON_1M) ~ WIP +(1|GEO),
+      mod_kFold <- lmer(formula = sqrt(CARBON_1M) ~ WIP +(1|LITHOL),
                         data    = dataTrain,
                         REML    = F)
       # Get predicted values on test dataset, as well as true values
       pred_kFold <- predict(object  = mod_kFold,
                             newdata = dataTest)
-      actual_kFold    <- log10(dataTest$CARBON_1M)
+      actual_kFold    <- sqrt(dataTest$CARBON_1M)
       # Calculate MSE for this fold
       kFoldMSE_temp <- kFoldMSE_temp + sum((pred_kFold - actual_kFold)^2)
     }
@@ -146,7 +137,7 @@ kFoldCV(K         = 36,
 bootPredIntervals <- function(reps      = 1000,   randSeed = 11,
                               pctLower  = 0.025,  pctUpper = 0.975){
   # Regular LMER model 
-  hoh_mod <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|GEO),
+  hoh_mod <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|LITHOL),
                   data    = hoh_dat,
                   REML    = F);summary(hoh_mod)
   
@@ -163,7 +154,7 @@ bootPredIntervals <- function(reps      = 1000,   randSeed = 11,
       mutate(log_CARBON = log10(CARBON_1M)) %>% #adding log carbon values
       arrange(NAME) #arranging by sample name 
     # Run model on bootstrap sample
-    modBoot <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|GEO),
+    modBoot <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|LITHOL),
                     data    = bootData,
                     REML    = F)
     # Create cleaned bootstrapped dataset for this replication
@@ -216,9 +207,9 @@ library(terra)
 
 k = 5
 WIP <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_WIP_Mask0_10_2022.tif")
-GEO <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassMask.tif")
-rs <- c(WIP, GEO)
-names(rs) <- c("WIP", "GEO")
+LITHOL <- rast("SOIL CARBON/SPATIAL LAYERS/SPATIAL_LAYERS_7_11_22/HOH/Hoh_GEO_250k_reclassMask.tif")
+rs <- c(WIP, LITHOL)
+names(rs) <- c("WIP", "LITHOL")
 predlist <- c(WIP)
 #val_preds <- matrix(nrow = nrow(hoh_dat), ncol = k)
 ##### Non-parallel
@@ -236,7 +227,7 @@ for(i in 1:k) {
         mutate(log_CARBON = log10(CARBON_1M)) %>% #adding log carbon values
         arrange(NAME) #arranging by sample name 
     # Fit a Hoh SOC model 
-    modBoot <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|GEO),
+    modBoot <- lmer(formula = log10(CARBON_1M) ~ WIP + (1|LITHOL),
                     data    = bootData,
                     REML    = F)
     # Create cleaned bootstrapped dataset for this replication
@@ -265,4 +256,5 @@ c_interval <- terra::app(predlist, function(x){
     quantile(x, probs = c(0.05, 0.95), na.rm = T)
 }, cores = 8, filename = "intervals.tif", overwrite = T)
 #c_interval <- terra::quantile(predlist, probs = c(0.025, 0.975), na.rm = T, filename = "intervals.tif")
-plot(c_interval)
+c_interval <- rast("intervals.tif")
+plot(10**c_interval)
